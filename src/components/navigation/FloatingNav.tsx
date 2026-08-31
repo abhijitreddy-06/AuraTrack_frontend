@@ -60,7 +60,7 @@ export const FloatingNav: React.FC<FloatingNavProps> = ({
             activeOpacity={0.6}
           >
             {key === "aura" ? (
-              <Text style={[styles.auraIcon, { color }]}>âœ¦</Text>
+              <Text style={[styles.auraIcon, { color }]}>✦</Text>
             ) : (
               <Feather
                 name={

@@ -160,11 +160,11 @@ export const NotesScreen: React.FC = () => {
     const lines = item.content.split("\n");
     let preview = lines.slice(0, PREVIEW_LINES).join("\n");
     if (lines.length > PREVIEW_LINES) {
-      preview += "â€¦";
+      preview += "…";
     }
     // If preview is too long, truncate at 100 chars roughly
     if (preview.length > 120) {
-      preview = preview.slice(0, 120) + "â€¦";
+      preview = preview.slice(0, 120) + "…";
     }
 
     return (
@@ -224,7 +224,7 @@ export const NotesScreen: React.FC = () => {
                 styles.textInput,
                 { color: colors.textPrimary, borderColor: colors.divider },
               ]}
-              placeholder="Write your note hereâ€¦"
+              placeholder="Write your note here…"
               placeholderTextColor={colors.textSecondary}
               multiline
               numberOfLines={4}

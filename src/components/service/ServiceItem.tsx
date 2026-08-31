@@ -17,7 +17,7 @@ export const ServiceItem: React.FC<ServiceItemProps> = ({ name, onPress }) => {
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handlePress = () => {
-    // Animate arrow â†’ slide right and back
+    // Animate arrow → slide right and back
     Animated.sequence([
       Animated.timing(arrowTranslate, {
         toValue: 10,

@@ -32,7 +32,7 @@ const PERIODS: Period[] = [
   "6 Months",
   "1 Year",
 ];
-const formatAmount = (amount: number) => `â‚¹${amount.toLocaleString("en-IN")}`;
+const formatAmount = (amount: number) => `₹${amount.toLocaleString("en-IN")}`;
 const PERIOD_API: Record<Period, AnalyticsPeriod> = {
   "This Week": "week",
   "This Month": "month",

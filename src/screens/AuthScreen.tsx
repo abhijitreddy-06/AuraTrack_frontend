@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   activeSegment: {
-    // no extra style needed â€“ indicator handles background
+    // no extra style needed — indicator handles background
   },
   segmentText: {
     fontSize: 16,

@@ -94,10 +94,7 @@ export const AddExpenseScreen: React.FC = () => {
     }
     const amountNum = Number(amount);
     if (!Number.isInteger(amountNum) || amountNum <= 0) {
-      Alert.alert(
-        "Validation",
-        "Please enter a positive whole-number amount.",
-      );
+      Alert.alert("Validation", "Please enter a positive whole-number amount.");
       return;
     }
     if (!date) {
@@ -243,7 +240,7 @@ export const AddExpenseScreen: React.FC = () => {
         </View>
       </View>
       <Text style={[styles.cardAmount, { color: colors.primary }]}>
-        â‚¹{item.amount.toFixed(2)}
+        ₹{item.amount.toFixed(2)}
       </Text>
       <View style={styles.cardDetails}>
         <Feather name="calendar" size={14} color={colors.textSecondary} />
@@ -267,11 +264,10 @@ export const AddExpenseScreen: React.FC = () => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return true;
 
-    const matchesQuery = (
+    const matchesQuery =
       expense.title.toLowerCase().includes(query) ||
       formatDate(expense.date).toLowerCase().includes(query) ||
-      expense.date.includes(query)
-    );
+      expense.date.includes(query);
     return matchesQuery;
   });
 
@@ -350,7 +346,7 @@ export const AddExpenseScreen: React.FC = () => {
                 styles.input,
                 { color: colors.textPrimary, borderColor: colors.divider },
               ]}
-              placeholder="Amount (â‚¹)"
+              placeholder="Amount (₹)"
               placeholderTextColor={colors.textSecondary}
               value={amount}
               onChangeText={setAmount}
@@ -472,7 +468,6 @@ export const AddExpenseScreen: React.FC = () => {
         onCancel={hideDatePicker}
         date={date || new Date()}
       />
-
 
       {/* Time Picker Modal */}
       <DateTimePickerModal

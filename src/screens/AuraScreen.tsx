@@ -87,14 +87,14 @@ export const AuraScreen: React.FC = () => {
                 </Text>
               </View>
               <Text style={[styles.headingSpark, { color: colors.primary }]}>
-                âœ¦
+                ✦
               </Text>
             </View>
 
             {!isChatting ? (
               <>
                 <Text style={[styles.greeting, { color: colors.textPrimary }]}>
-                  Good afternoon, Abhi ðŸ‘‹
+                  Good afternoon, Abhi 👋
                 </Text>
                 <View
                   style={[
@@ -103,7 +103,7 @@ export const AuraScreen: React.FC = () => {
                   ]}
                 >
                   <Text style={[styles.cardSpark, { color: colors.primary }]}>
-                    âœ¦
+                    ✦
                   </Text>
                   <Text
                     style={[styles.cardTitle, { color: colors.textPrimary }]}
@@ -142,7 +142,7 @@ export const AuraScreen: React.FC = () => {
                         {suggestion}
                       </Text>
                       <Text style={[styles.arrow, { color: colors.primary }]}>
-                        â†—
+                        →
                       </Text>
                     </Pressable>
                   ))}
@@ -182,7 +182,7 @@ export const AuraScreen: React.FC = () => {
             },
           ]}
         >
-          <Text style={[styles.inputSpark, { color: colors.primary }]}>âœ¦</Text>
+          <Text style={[styles.inputSpark, { color: colors.primary }]}>✦</Text>
           <TextInput
             value={question}
             onChangeText={setQuestion}
@@ -197,7 +197,7 @@ export const AuraScreen: React.FC = () => {
             onPress={() => askAura(question)}
             style={[styles.sendButton, { backgroundColor: colors.primary }]}
           >
-            <Text style={styles.sendIcon}>â†‘</Text>
+            <Text style={styles.sendIcon}>➤</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>

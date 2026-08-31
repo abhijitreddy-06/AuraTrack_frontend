@@ -1,4 +1,4 @@
-    import React, { useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,47 +11,63 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import { useRouter } from 'expo-router';
-import { useTheme } from '../hooks/useTheme';
-import { spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
+import { useRouter } from "expo-router";
+import { useTheme } from "../hooks/useTheme";
+import { spacing } from "../theme/spacing";
+import { typography } from "../theme/typography";
+import {
+  createDocument,
+  deleteDocument,
+  downloadDocument,
+  getDocuments,
+  DocumentSummary,
+} from "../services/documents";
 
-type DocumentItem = {
-  id: string;
-  name: string;        // userâ€‘given name
-  fileName: string;    // original file name
-  size: number;        // in bytes
-  mimeType: string;
-  uri: string;
+type DocumentItem = DocumentSummary & {
+  uri?: string;
 };
 
-// Allowed MIME types
 const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'image/jpeg',
-  'image/png',
-  'image/jpg',
-  'audio/mpeg',
-  'video/mp4',
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/jpeg",
+  "image/png",
+  "image/jpg",
+  "audio/mpeg",
+  "video/mp4",
 ];
 
-const MAX_SIZE = 100 * 1024 * 1024; // 100 MB in bytes
+const MAX_SIZE = 100 * 1024 * 1024;
 
 export const DocumentsScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const router = useRouter();
-  const [docName, setDocName] = useState('');
+  const [docName, setDocName] = useState("");
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [selectedFile, setSelectedFile] =
+    useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadDocuments = async () => {
+    try {
+      const result = await getDocuments();
+      setDocuments(result.data || []);
+    } catch (error) {
+      console.error("Failed to load documents", error);
+    }
+  };
+
+  useEffect(() => {
+    void loadDocuments();
+  }, []);
 
   const pickDocument = async () => {
     try {
@@ -65,65 +81,107 @@ export const DocumentsScreen: React.FC = () => {
       }
 
       const asset = result.assets[0];
-      // Validate file size
       if (asset.size && asset.size > MAX_SIZE) {
-        Alert.alert('File too large', 'Maximum file size is 100 MB.');
+        Alert.alert("File too large", "Maximum file size is 100 MB.");
         return;
       }
 
-      // Validate MIME type (should be in allowed list)
       if (asset.mimeType && !ALLOWED_MIME_TYPES.includes(asset.mimeType)) {
-        Alert.alert('Invalid file type', 'Please select a PDF, DOC, DOCX, PPT, image, MP3, or MP4 file.');
+        Alert.alert(
+          "Invalid file type",
+          "Please select a PDF, DOC, DOCX, PPT, image, MP3, or MP4 file.",
+        );
         return;
       }
 
       setSelectedFile(asset);
     } catch (error) {
-      console.error('Error picking document:', error);
-      Alert.alert('Error', 'Failed to pick document.');
+      console.error("Error picking document:", error);
+      Alert.alert("Error", "Failed to pick document.");
     }
   };
 
-  const addDocument = () => {
+  const addDocument = async () => {
     const trimmedName = docName.trim();
     if (!trimmedName) {
-      Alert.alert('Validation', 'Please enter a document name.');
+      Alert.alert("Validation", "Please enter a document name.");
       return;
     }
     if (!selectedFile) {
-      Alert.alert('Validation', 'Please select a file.');
+      Alert.alert("Validation", "Please select a file.");
       return;
     }
 
-    const newDoc: DocumentItem = {
-      id: Date.now().toString(),
-      name: trimmedName,
-      fileName: selectedFile.name || 'Unnamed',
-      size: selectedFile.size || 0,
-      mimeType: selectedFile.mimeType || 'unknown',
-      uri: selectedFile.uri,
-    };
+    try {
+      setIsLoading(true);
+      const fileUri = selectedFile.uri;
+      const fileContent = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: "base64",
+      });
 
-    setDocuments((prev) => [...prev, newDoc]);
-    setDocName('');
-    setSelectedFile(null);
+      await createDocument({
+        name: trimmedName,
+        originalName: selectedFile.name || "document",
+        mimeType: selectedFile.mimeType || "application/octet-stream",
+        size: selectedFile.size || 0,
+        fileContentBase64: fileContent,
+      });
+
+      setDocName("");
+      setSelectedFile(null);
+      await loadDocuments();
+      Alert.alert("Success", "Document uploaded securely.");
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      Alert.alert("Upload failed", "The document could not be uploaded.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const deleteDocument = (id: string) => {
+  const handleDelete = async (id: string) => {
     Alert.alert(
-      'Delete Document',
-      'Are you sure you want to delete this document?',
+      "Delete Document",
+      "Are you sure you want to delete this document?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setDocuments((prev) => prev.filter((d) => d.id !== id));
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDocument(id);
+              await loadDocuments();
+            } catch (error) {
+              console.error("Error deleting document:", error);
+              Alert.alert(
+                "Delete failed",
+                "The document could not be deleted.",
+              );
+            }
           },
         },
-      ]
+      ],
     );
+  };
+
+  const handleDownload = async (item: DocumentItem) => {
+    try {
+      const result = await downloadDocument(item.id);
+      const content = result.data?.fileContentBase64;
+      if (!content) {
+        throw new Error("No file data returned by the server");
+      }
+
+      const outputFile = `${FileSystem.Paths.document.uri}${(item.originalName || item.name).replace(/\s+/g, "_")}`;
+      await FileSystem.writeAsStringAsync(outputFile, content, {
+        encoding: "base64",
+      });
+      Alert.alert("Download ready", `Saved to ${outputFile}`);
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      Alert.alert("Download failed", "The file could not be downloaded.");
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -133,28 +191,40 @@ export const DocumentsScreen: React.FC = () => {
   };
 
   const renderItem = ({ item }: { item: DocumentItem }) => (
-    <View style={[styles.card, { backgroundColor: colors.secondaryBackground }]}>
-      <View style={styles.cardContent}>
+    <View
+      style={[styles.card, { backgroundColor: colors.secondaryBackground }]}
+    >
+      <TouchableOpacity
+        style={styles.cardContent}
+        onPress={() => handleDownload(item)}
+      >
         <Text style={[styles.docName, { color: colors.textPrimary }]}>
           {item.name}
         </Text>
         <Text style={[styles.docInfo, { color: colors.textSecondary }]}>
-          {item.fileName} â€¢ {formatSize(item.size)}
+          {item.originalName || item.name} • {formatSize(item.size)}
         </Text>
-      </View>
-      <TouchableOpacity onPress={() => deleteDocument(item.id)} style={styles.deleteButton}>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => handleDelete(item.id)}
+        style={styles.deleteButton}
+      >
         <Feather name="trash-2" size={20} color={colors.expense} />
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Feather name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -164,12 +234,16 @@ export const DocumentsScreen: React.FC = () => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Form */}
-          <View style={[styles.form, { backgroundColor: colors.secondaryBackground }]}>
+          <View
+            style={[
+              styles.form,
+              { backgroundColor: colors.secondaryBackground },
+            ]}
+          >
             <TextInput
               style={[
                 styles.input,
@@ -186,11 +260,16 @@ export const DocumentsScreen: React.FC = () => {
               onPress={pickDocument}
             >
               <Feather name="file" size={20} color={colors.primary} />
-              <Text style={[styles.pickButtonText, { color: colors.textPrimary }]}>
-                {selectedFile ? selectedFile.name : 'Choose a file'}
+              <Text
+                style={[styles.pickButtonText, { color: colors.textPrimary }]}
+              >
+                {selectedFile ? selectedFile.name : "Choose a file"}
               </Text>
               {selectedFile && (
-                <TouchableOpacity onPress={() => setSelectedFile(null)} style={styles.clearFile}>
+                <TouchableOpacity
+                  onPress={() => setSelectedFile(null)}
+                  style={styles.clearFile}
+                >
                   <Feather name="x" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               )}
@@ -198,11 +277,15 @@ export const DocumentsScreen: React.FC = () => {
 
             {selectedFile && (
               <View style={styles.fileInfo}>
-                <Text style={[styles.fileInfoText, { color: colors.textSecondary }]}>
+                <Text
+                  style={[styles.fileInfoText, { color: colors.textSecondary }]}
+                >
                   Size: {formatSize(selectedFile.size || 0)}
                 </Text>
-                <Text style={[styles.fileInfoText, { color: colors.textSecondary }]}>
-                  Type: {selectedFile.mimeType || 'Unknown'}
+                <Text
+                  style={[styles.fileInfoText, { color: colors.textSecondary }]}
+                >
+                  Type: {selectedFile.mimeType || "Unknown"}
                 </Text>
               </View>
             )}
@@ -210,12 +293,14 @@ export const DocumentsScreen: React.FC = () => {
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
               onPress={addDocument}
+              disabled={isLoading}
             >
-              <Text style={styles.addButtonText}>Add Document</Text>
+              <Text style={styles.addButtonText}>
+                {isLoading ? "Uploading..." : "Add Document"}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* List */}
           {documents.length > 0 ? (
             <FlatList
               data={documents}
@@ -226,7 +311,12 @@ export const DocumentsScreen: React.FC = () => {
             />
           ) : (
             <View style={styles.emptyContainer}>
-              <Feather name="folder" size={60} color={colors.textSecondary} opacity={0.5} />
+              <Feather
+                name="folder"
+                size={60}
+                color={colors.textSecondary}
+                opacity={0.5}
+              />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 No documents added yet.
               </Text>
@@ -243,9 +333,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
@@ -254,18 +344,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing["2xl"],
   },
   form: {
     borderRadius: 16,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -281,8 +371,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   pickButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: spacing.md,
@@ -308,24 +398,24 @@ const styles = StyleSheet.create({
   addButton: {
     borderRadius: 8,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   addButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
   },
   listContainer: {
     paddingBottom: spacing.sm,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -336,7 +426,7 @@ const styles = StyleSheet.create({
   },
   docName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
   },
   docInfo: {
@@ -348,14 +438,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing['3xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing["3xl"],
     gap: spacing.md,
   },
   emptyText: {
     fontSize: 16,
     fontFamily: typography.family,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

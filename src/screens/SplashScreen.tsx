@@ -24,7 +24,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// Rising stock line path â€“ jagged upward trend
+// Rising stock line path — jagged upward trend
 const PATH =
   "M0,120 L40,105 L75,115 L115,80 L155,90 L195,55 L235,65 L275,30 L315,10";
 const PATH_LENGTH = 420; // approximate arc length
@@ -108,7 +108,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                   stopColor={splashColors.primary}
                   stopOpacity="0.35"
                 />
-                <Stop offset="1" stopColor={splashColors.primary} stopOpacity="1" />
+                <Stop
+                  offset="1"
+                  stopColor={splashColors.primary}
+                  stopOpacity="1"
+                />
               </LinearGradient>
             </Defs>
 
@@ -144,13 +148,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           </Svg>
         </View>
 
-        {/* App name & tagline â€“ using our Logo component? 
+        {/* App name & tagline — using our Logo component?
             We'll keep it simple with the given style */}
         <AnimatedView style={[styles.brandBlock, { opacity: brandOpacity }]}>
           <Text
             style={[
               styles.appName,
-              { color: splashColors.textPrimary, fontFamily: typography.family },
+              {
+                color: splashColors.textPrimary,
+                fontFamily: typography.family,
+              },
             ]}
             testID="splash-app-name"
           >
@@ -159,7 +166,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           <Text
             style={[
               styles.tagline,
-              { color: splashColors.textSecondary, fontFamily: typography.family },
+              {
+                color: splashColors.textSecondary,
+                fontFamily: typography.family,
+              },
             ]}
           >
             Your money, on the rise.

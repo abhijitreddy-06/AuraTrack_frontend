@@ -2,12 +2,28 @@ import * as SecureStore from "expo-secure-store";
 import { clearUserOfflineData } from "../offline/database";
 
 const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-const defaultBaseUrl = "http://localhost:5000";
+const defaultBaseUrl = "https://auratrack-9z5t.onrender.com";
 const API_BASE_URL = (configuredBaseUrl || defaultBaseUrl).replace(/\/$/, "");
 
 const ACCESS_TOKEN_KEY = "auratrack.accessToken";
 const REFRESH_TOKEN_KEY = "auratrack.refreshToken";
 const SESSION_USER_KEY = "auratrack.sessionUser";
+const REQUEST_TIMEOUT_MS = 15000;
+
+const fetchWithTimeout = async (
+  url: string,
+  init: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export type SessionUser = {
   id: string;
@@ -30,7 +46,7 @@ const request = async (path: string, body: object): Promise<AuthResponse> => {
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -113,8 +129,13 @@ export const restoreSession = async () => {
       return true;
     }
 
-    await clearSession();
-    return false;
+    const status = (error as Error & { status?: number }).status;
+    if (status === 401 || status === 403) {
+      await clearSession();
+      return false;
+    }
+
+    return true;
   }
 };
 
@@ -220,7 +241,7 @@ const sendAuthenticatedRequest = async <T>(
   options: AuthenticatedRequestOptions,
 ) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
       method: options.method || "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -323,7 +344,7 @@ const verifyAccessToken = async (accessToken: string) => {
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/me`, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -395,7 +416,12 @@ export const verifySession = async () => {
       return true;
     }
 
-    await clearSession();
-    return false;
+    const status = (error as Error & { status?: number }).status;
+    if (status === 401 || status === 403) {
+      await clearSession();
+      return false;
+    }
+
+    return true;
   }
 };

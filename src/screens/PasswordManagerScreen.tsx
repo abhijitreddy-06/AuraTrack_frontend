@@ -229,7 +229,7 @@ export const PasswordManagerScreen: React.FC = () => {
         <View style={styles.detailRow}>
           <Feather name="lock" size={16} color={colors.textSecondary} />
           <Text style={[styles.detailText, { color: colors.textSecondary }]}>
-            {isVisible && secret ? secret.value : "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"}
+            {isVisible && secret ? secret.value : "••••••••"}
           </Text>
           <TouchableOpacity
             onPress={() => void toggleShowPassword(item.id)}

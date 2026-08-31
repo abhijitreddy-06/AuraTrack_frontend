@@ -22,7 +22,13 @@ import { useTheme } from "../hooks/useTheme";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import { getISTDate } from "../utils/ist";
-import { PlannedExpense, createPlannedExpense, deletePlannedExpense, getPlannedExpenses, updatePlannedExpense } from "../services/plannedExpenses";
+import {
+  PlannedExpense,
+  createPlannedExpense,
+  deletePlannedExpense,
+  getPlannedExpenses,
+  updatePlannedExpense,
+} from "../services/plannedExpenses";
 
 // Configure calendar locale (optional)
 LocaleConfig.locales["en"] = {
@@ -72,9 +78,7 @@ export const PlannedExpensesScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const [expenses, setExpenses] = useState<PlannedExpense[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    getISTDate(),
-  );
+  const [selectedDate, setSelectedDate] = useState<string>(getISTDate());
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -92,7 +96,10 @@ export const PlannedExpensesScreen: React.FC = () => {
       const response = await getPlannedExpenses();
       setExpenses(response.data);
     } catch (error) {
-      Alert.alert("Could not load planned expenses", error instanceof Error ? error.message : "Please try again.");
+      Alert.alert(
+        "Could not load planned expenses",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     }
   };
 
@@ -144,11 +151,20 @@ export const PlannedExpensesScreen: React.FC = () => {
       return;
     }
 
-    const payload = { title: name.trim(), amount: amountNum, date, time: time ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}` : null };
+    const payload = {
+      title: name.trim(),
+      amount: amountNum,
+      date,
+      time: time
+        ? `${String(time.getHours()).padStart(2, "0")}:${String(time.getMinutes()).padStart(2, "0")}`
+        : null,
+    };
     try {
       if (editingId) {
         const response = await updatePlannedExpense(editingId, payload);
-        setExpenses((current) => current.map((item) => item.id === editingId ? response.data : item));
+        setExpenses((current) =>
+          current.map((item) => (item.id === editingId ? response.data : item)),
+        );
       } else {
         const response = await createPlannedExpense(payload);
         setExpenses((current) => [...current, response.data]);
@@ -156,7 +172,10 @@ export const PlannedExpensesScreen: React.FC = () => {
       resetForm();
       setModalVisible(false);
     } catch (error) {
-      Alert.alert("Could not save planned expense", error instanceof Error ? error.message : "Please try again.");
+      Alert.alert(
+        "Could not save planned expense",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     }
   };
 
@@ -186,7 +205,20 @@ export const PlannedExpensesScreen: React.FC = () => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => void (async () => { try { await deletePlannedExpense(id); setExpenses((current) => current.filter((item) => item.id !== id)); } catch (error) { Alert.alert("Could not delete planned expense", error instanceof Error ? error.message : "Please try again."); } })(),
+          onPress: () =>
+            void (async () => {
+              try {
+                await deletePlannedExpense(id);
+                setExpenses((current) =>
+                  current.filter((item) => item.id !== id),
+                );
+              } catch (error) {
+                Alert.alert(
+                  "Could not delete planned expense",
+                  error instanceof Error ? error.message : "Please try again.",
+                );
+              }
+            })(),
         },
       ],
     );
@@ -236,7 +268,7 @@ export const PlannedExpensesScreen: React.FC = () => {
         </View>
       </View>
       <Text style={[styles.cardAmount, { color: colors.primary }]}>
-        â‚¹{item.amount.toFixed(2)}
+        ₹{item.amount.toFixed(2)}
       </Text>
       {item.time && (
         <Text style={[styles.cardTime, { color: colors.textSecondary }]}>
@@ -295,7 +327,7 @@ export const PlannedExpensesScreen: React.FC = () => {
               <Text
                 style={[styles.summaryValue, { color: colors.textPrimary }]}
               >
-                â‚¹{total.toFixed(2)}
+                ₹{total.toFixed(2)}
               </Text>
               <Text
                 style={[styles.summaryLabel, { color: colors.textSecondary }]}
@@ -422,7 +454,7 @@ export const PlannedExpensesScreen: React.FC = () => {
                 styles.input,
                 { color: colors.textPrimary, borderColor: colors.divider },
               ]}
-              placeholder="Amount (â‚¹)"
+              placeholder="Amount (₹)"
               placeholderTextColor={colors.textSecondary}
               value={amount}
               onChangeText={setAmount}

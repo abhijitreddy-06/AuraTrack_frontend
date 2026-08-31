@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,13 +12,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useTheme } from '../hooks/useTheme';
-import { spacing } from '../theme/spacing';
-import { typography } from '../theme/typography';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useTheme } from "../hooks/useTheme";
+import { spacing } from "../theme/spacing";
+import { typography } from "../theme/typography";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import {
   Income,
@@ -32,10 +32,10 @@ export const AddIncomeScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
   const router = useRouter();
   const [incomes, setIncomes] = useState<Income[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState<Date | null>(null);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
@@ -50,57 +50,82 @@ export const AddIncomeScreen: React.FC = () => {
       const response = await getIncomes();
       setIncomes(response.data);
     } catch (error) {
-      Alert.alert('Could not load incomes', error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert(
+        "Could not load incomes",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     }
   };
 
-  const toApiDate = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  const toApiTime = (value: Date) => `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
-  const parseApiDate = (value: string) => { const [year, month, day] = value.slice(0, 10).split('-').map(Number); return new Date(year, month - 1, day); };
-  const parseApiTime = (value: string) => { const [hours, minutes] = value.split(':').map(Number); const date = new Date(); date.setHours(hours, minutes, 0, 0); return date; };
+  const toApiDate = (value: Date) =>
+    `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  const toApiTime = (value: Date) =>
+    `${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`;
+  const parseApiDate = (value: string) => {
+    const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+  const parseApiTime = (value: string) => {
+    const [hours, minutes] = value.split(":").map(Number);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
 
   const handleSubmit = async () => {
     // Validation
     if (!name.trim()) {
-      Alert.alert('Validation', 'Please enter a description.');
+      Alert.alert("Validation", "Please enter a description.");
       return;
     }
     if (!amount.trim()) {
-      Alert.alert('Validation', 'Please enter an amount.');
+      Alert.alert("Validation", "Please enter an amount.");
       return;
     }
     const amountNum = Number(amount);
     if (!Number.isInteger(amountNum) || amountNum <= 0) {
-      Alert.alert('Validation', 'Please enter a positive whole-number amount.');
+      Alert.alert("Validation", "Please enter a positive whole-number amount.");
       return;
     }
     if (!date) {
-      Alert.alert('Validation', 'Please select a date.');
+      Alert.alert("Validation", "Please select a date.");
       return;
     }
     if (!time) {
-      Alert.alert('Validation', 'Please select a time.');
+      Alert.alert("Validation", "Please select a time.");
       return;
     }
 
-    const payload = { title: name.trim(), amount: amountNum, date: toApiDate(date), time: toApiTime(time) };
+    const payload = {
+      title: name.trim(),
+      amount: amountNum,
+      date: toApiDate(date),
+      time: toApiTime(time),
+    };
     try {
       if (editingId) {
         const response = await updateIncome(editingId, payload);
-        setIncomes((current) => current.map((income) => income.id === editingId ? response.data : income));
+        setIncomes((current) =>
+          current.map((income) =>
+            income.id === editingId ? response.data : income,
+          ),
+        );
       } else {
         const response = await createIncome(payload);
         setIncomes((current) => [...current, response.data]);
       }
       resetForm();
     } catch (error) {
-      Alert.alert(`Could not ${editingId ? 'update' : 'save'} income`, error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert(
+        `Could not ${editingId ? "update" : "save"} income`,
+        error instanceof Error ? error.message : "Please try again.",
+      );
     }
   };
 
   const resetForm = () => {
-    setName('');
-    setAmount('');
+    setName("");
+    setAmount("");
     setDate(null);
     setTime(null);
     setEditingId(null);
@@ -116,23 +141,29 @@ export const AddIncomeScreen: React.FC = () => {
 
   const handleDelete = (id: string) => {
     Alert.alert(
-      'Delete Income',
-      'Are you sure you want to delete this income entry?',
+      "Delete Income",
+      "Are you sure you want to delete this income entry?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => void (async () => {
-            try {
-              await deleteIncomeRequest(id);
-              setIncomes((current) => current.filter((income) => income.id !== id));
-            } catch (error) {
-              Alert.alert('Could not delete income', error instanceof Error ? error.message : 'Please try again.');
-            }
-          })(),
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            void (async () => {
+              try {
+                await deleteIncomeRequest(id);
+                setIncomes((current) =>
+                  current.filter((income) => income.id !== id),
+                );
+              } catch (error) {
+                Alert.alert(
+                  "Could not delete income",
+                  error instanceof Error ? error.message : "Please try again.",
+                );
+              }
+            })(),
         },
-      ]
+      ],
     );
   };
 
@@ -158,32 +189,40 @@ export const AddIncomeScreen: React.FC = () => {
 
   const formatDate = (isoString: string) => {
     const d = parseApiDate(isoString);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   };
 
   const formatTime = (isoString: string) => {
     const d = parseApiTime(isoString);
-    return d.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
+    return d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const renderItem = ({ item }: { item: Income }) => (
-    <View style={[styles.card, { backgroundColor: colors.secondaryBackground }]}>
+    <View
+      style={[styles.card, { backgroundColor: colors.secondaryBackground }]}
+    >
       <View style={styles.cardHeader}>
         <Text style={[styles.cardName, { color: colors.textPrimary }]}>
           {item.title}
         </Text>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={() => handleEdit(item)}
+            style={styles.actionButton}
+          >
             <Feather name="edit-2" size={18} color={colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.actionButton}>
+          <TouchableOpacity
+            onPress={() => handleDelete(item.id)}
+            style={styles.actionButton}
+          >
             <Feather name="trash-2" size={18} color={colors.expense} />
           </TouchableOpacity>
         </View>
@@ -196,7 +235,12 @@ export const AddIncomeScreen: React.FC = () => {
         <Text style={[styles.cardDate, { color: colors.textSecondary }]}>
           {formatDate(item.date)}
         </Text>
-        <Feather name="clock" size={14} color={colors.textSecondary} style={styles.detailIcon} />
+        <Feather
+          name="clock"
+          size={14}
+          color={colors.textSecondary}
+          style={styles.detailIcon}
+        />
         <Text style={[styles.cardDate, { color: colors.textSecondary }]}>
           {formatTime(item.time)}
         </Text>
@@ -216,12 +260,17 @@ export const AddIncomeScreen: React.FC = () => {
   });
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Feather name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -231,14 +280,22 @@ export const AddIncomeScreen: React.FC = () => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[styles.searchContainer, { borderColor: colors.divider, backgroundColor: colors.secondaryBackground }]}>
+          <View
+            style={[
+              styles.searchContainer,
+              {
+                borderColor: colors.divider,
+                backgroundColor: colors.secondaryBackground,
+              },
+            ]}
+          >
             <Feather name="search" size={18} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.textPrimary }]}
@@ -251,13 +308,21 @@ export const AddIncomeScreen: React.FC = () => {
           </View>
 
           {/* Form */}
-          <View style={[styles.form, { backgroundColor: colors.secondaryBackground }]}>
+          <View
+            style={[
+              styles.form,
+              { backgroundColor: colors.secondaryBackground },
+            ]}
+          >
             <Text style={[styles.formTitle, { color: colors.textPrimary }]}>
-              {editingId ? 'Edit Income' : 'Add New Income'}
+              {editingId ? "Edit Income" : "Add New Income"}
             </Text>
 
             <TextInput
-              style={[styles.input, { color: colors.textPrimary, borderColor: colors.divider }]}
+              style={[
+                styles.input,
+                { color: colors.textPrimary, borderColor: colors.divider },
+              ]}
               placeholder="What did you earn from?"
               placeholderTextColor={colors.textSecondary}
               value={name}
@@ -265,8 +330,11 @@ export const AddIncomeScreen: React.FC = () => {
             />
 
             <TextInput
-              style={[styles.input, { color: colors.textPrimary, borderColor: colors.divider }]}
-              placeholder="Amount (â‚¹)"
+              style={[
+                styles.input,
+                { color: colors.textPrimary, borderColor: colors.divider },
+              ]}
+              placeholder="Amount (₹)"
               placeholderTextColor={colors.textSecondary}
               value={amount}
               onChangeText={setAmount}
@@ -278,9 +346,24 @@ export const AddIncomeScreen: React.FC = () => {
                 style={[styles.dateButton, { borderColor: colors.divider }]}
                 onPress={showDatePicker}
               >
-                <Feather name="calendar" size={20} color={colors.textSecondary} />
-                <Text style={[styles.dateText, { color: date ? colors.textPrimary : colors.textSecondary }]}>
-                  {date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select Date'}
+                <Feather
+                  name="calendar"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.dateText,
+                    { color: date ? colors.textPrimary : colors.textSecondary },
+                  ]}
+                >
+                  {date
+                    ? date.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "Select Date"}
                 </Text>
               </TouchableOpacity>
 
@@ -289,8 +372,18 @@ export const AddIncomeScreen: React.FC = () => {
                 onPress={showTimePicker}
               >
                 <Feather name="clock" size={20} color={colors.textSecondary} />
-                <Text style={[styles.dateText, { color: time ? colors.textPrimary : colors.textSecondary }]}>
-                  {time ? time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
+                <Text
+                  style={[
+                    styles.dateText,
+                    { color: time ? colors.textPrimary : colors.textSecondary },
+                  ]}
+                >
+                  {time
+                    ? time.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "Select Time"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -298,10 +391,19 @@ export const AddIncomeScreen: React.FC = () => {
             <View style={styles.formActions}>
               {editingId && (
                 <TouchableOpacity
-                  style={[styles.formButton, styles.cancelButton, { borderColor: colors.divider }]}
+                  style={[
+                    styles.formButton,
+                    styles.cancelButton,
+                    { borderColor: colors.divider },
+                  ]}
                   onPress={resetForm}
                 >
-                  <Text style={[styles.formButtonText, { color: colors.textPrimary }]}>
+                  <Text
+                    style={[
+                      styles.formButtonText,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
                     Cancel
                   </Text>
                 </TouchableOpacity>
@@ -315,7 +417,7 @@ export const AddIncomeScreen: React.FC = () => {
                 onPress={handleSubmit}
               >
                 <Text style={styles.submitButtonText}>
-                  {editingId ? 'Update' : 'Save'}
+                  {editingId ? "Update" : "Save"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -332,7 +434,12 @@ export const AddIncomeScreen: React.FC = () => {
             />
           ) : (
             <View style={styles.emptyContainer}>
-              <Feather name="trending-up" size={60} color={colors.textSecondary} opacity={0.5} />
+              <Feather
+                name="trending-up"
+                size={60}
+                color={colors.textSecondary}
+                opacity={0.5}
+              />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 No income recorded yet.
               </Text>
@@ -367,9 +474,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
@@ -378,26 +485,26 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
   },
   scrollContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing["2xl"],
   },
   form: {
     borderRadius: 16,
     padding: spacing.md,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
     minHeight: 56,
     borderWidth: 1,
@@ -414,7 +521,7 @@ const styles = StyleSheet.create({
   },
   formTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
     marginBottom: spacing.md,
   },
@@ -428,14 +535,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   row: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
   dateButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: spacing.md,
@@ -447,7 +554,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.family,
   },
   formActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
@@ -455,22 +562,22 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
   },
   cancelButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   formButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
   },
   submitButton: {},
   submitButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
   },
   listContainer: {
@@ -480,25 +587,25 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   cardName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: typography.family,
     flex: 1,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
   },
   actionButton: {
@@ -506,13 +613,13 @@ const styles = StyleSheet.create({
   },
   cardAmount: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     fontFamily: typography.family,
     marginVertical: 4,
   },
   cardDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 2,
   },
@@ -524,14 +631,14 @@ const styles = StyleSheet.create({
     fontFamily: typography.family,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing['3xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing["3xl"],
     gap: spacing.md,
   },
   emptyText: {
     fontSize: 16,
     fontFamily: typography.family,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

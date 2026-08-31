@@ -200,7 +200,7 @@ export const HabitsScreen: React.FC = () => {
                 { color: doneToday ? colors.income : colors.textSecondary },
               ]}
             >
-              {doneToday ? "âœ…" : "â¬œ"}
+              {doneToday ? "✅" : "☐"}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
               Today

@@ -1,0 +1,33 @@
+# Dependencies and generated Expo files
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Generated native projects and build outputs
+android/
+ios/
+build/
+coverage/
+.eas/
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+credentials.json
+google-services.json
+GoogleService-Info.plist
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Firebase/admin secrets
+public/auratrack-87c36-firebase-adminsdk-fbsvc-254f4d34b8.json
+*.firebase-adminsdk-*.json

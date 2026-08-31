@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "AuraTrack",
+    "slug": "auratrack",
+    "scheme": "auratrack",
+    "version": "1.0.1",
+    "sdkVersion": "54.0.0",
+    "icon": "./public/logo.png",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./public/logo_2.png",
+          "color": "#4F8CFF"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow AuraTrack to use Face ID to unlock the app."
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "android": {
+      "icon": "./public/logo.png",
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./public/logo_2.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "package": "com.abhijitreddy.auratrack",
+      "versionCode": 2
+    },
+    "ios": {
+      "bundleIdentifier": "com.abhijitreddy.auratrack"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5ac4388e-17f3-488d-ad10-db95edb010a5"
+      }
+    },
+    "owner": "abhijit_reddy543"
+  }
+}

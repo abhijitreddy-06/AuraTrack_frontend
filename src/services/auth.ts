@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { clearUserOfflineData } from "../offline/database";
+import { getNetworkState } from "../offline/network";
 
 const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 const defaultBaseUrl = "https://auratrack-9z5t.onrender.com";
@@ -65,10 +66,24 @@ const request = async (path: string, body: object): Promise<AuthResponse> => {
 
   const result = (await response.json().catch(() => ({}))) as AuthResponse;
   if (!response.ok || !result.success) {
-    throw new Error(result.message || "Authentication failed.");
+    const authError = new Error(result.message || "Authentication failed.");
+    Object.assign(authError, {
+      status: response.status,
+      isAuthFailure: true,
+    });
+    throw authError;
   }
 
   return result;
+};
+
+const isOfflineNow = async () => {
+  try {
+    const state = await getNetworkState();
+    return !(state.isConnected ?? state.isInternetReachable ?? true);
+  } catch {
+    return false;
+  }
 };
 
 const saveTokens = async (result: AuthResponse) => {
@@ -130,7 +145,7 @@ export const restoreSession = async () => {
     }
 
     const status = (error as Error & { status?: number }).status;
-    if (status === 401 || status === 403) {
+    if ((status === 401 || status === 403) && !(await isOfflineNow())) {
       await clearSession();
       return false;
     }
@@ -386,11 +401,13 @@ export const verifySession = async () => {
       return true;
     }
 
-    if (
-      !(error instanceof Error) ||
-      (error as Error & { status?: number }).status !== 401
-    ) {
+    const status = (error as Error & { status?: number }).status;
+    if (status !== 401 && status !== 403) {
       return false;
+    }
+
+    if (await isOfflineNow()) {
+      return true;
     }
   }
 
@@ -417,7 +434,7 @@ export const verifySession = async () => {
     }
 
     const status = (error as Error & { status?: number }).status;
-    if (status === 401 || status === 403) {
+    if ((status === 401 || status === 403) && !(await isOfflineNow())) {
       await clearSession();
       return false;
     }

@@ -37,7 +37,7 @@ const SECTIONS = [
   {
     title: "Productivity",
     icon: "check-square" as SectionIcon,
-    data: ["Todo List", "Habits", "Notes", "Birthdays"],
+    data: ["AI Assistant", "Todo List", "Habits", "Notes", "Birthdays"],
   },
   {
     title: "Security & Documents",
@@ -56,8 +56,10 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleServicePress = (service: string) => {
-    if (service === "Birthdays") {
-      router.push("/birthday"); // we'll create this route
+    if (service === "AI Assistant") {
+      router.push("/aura");
+    } else if (service === "Birthdays") {
+      router.push("/birthday");
     } else if (service === "Todo List") {
       router.push("/todo");
     } else if (service === "Password Manager") {

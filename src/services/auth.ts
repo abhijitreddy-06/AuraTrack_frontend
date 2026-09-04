@@ -126,12 +126,13 @@ export const signup = async (
 export const restoreSession = async () => {
   const accessToken = await getAccessToken();
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  const sessionUser = await getSessionUser();
 
-  if (!accessToken && !refreshToken) {
+  if (!accessToken && !refreshToken && !sessionUser) {
     return false;
   }
 
-  if (accessToken && !refreshToken) {
+  if ((!accessToken && !refreshToken) || (accessToken && !refreshToken)) {
     return true;
   }
 
@@ -390,7 +391,10 @@ const verifyAccessToken = async (accessToken: string) => {
 export const verifySession = async () => {
   const accessToken = await getAccessToken();
   if (!accessToken) {
-    return false;
+    return Boolean(
+      (await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)) ||
+      (await getSessionUser()),
+    );
   }
 
   try {

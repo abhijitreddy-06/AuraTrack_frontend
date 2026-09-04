@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { HomeScreen } from "../src/screens/HomeScreen";
 import {
   getCurrentUser,
+  getAccessToken,
   getSessionUser,
   isNetworkFailure,
   verifySession,
@@ -26,12 +27,13 @@ export default function HomeRoute() {
         if (!mounted) return;
         if (authenticated) {
           await loadThemePreference();
-          let user;
-          try {
-            user = await getCurrentUser();
-          } catch (error) {
-            if (!isNetworkFailure(error)) throw error;
-            user = await getSessionUser();
+          let user = await getSessionUser();
+          if (await getAccessToken()) {
+            try {
+              user = await getCurrentUser();
+            } catch (error) {
+              if (!isNetworkFailure(error)) throw error;
+            }
           }
           if (!mounted) return;
           initializeForUser(user || null);

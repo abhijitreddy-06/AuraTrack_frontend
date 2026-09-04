@@ -41,7 +41,7 @@ const getFriendlyAiError = (error: unknown) => {
     const status = (error as Error & { status?: number }).status;
     const message = error.message.toLowerCase();
     if (status === 502 || message.includes("provider is unavailable")) {
-      return "Aura’s AI service is unavailable. Check the server’s Gemini API key and model configuration.";
+      return "Aura’s AI service is unavailable. Check the server’s OpenRouter API key and model configuration.";
     }
     if (isNetworkFailure(error) || message.includes("failed to fetch")) {
       return "No internet connection. Please check your connection and try again.";

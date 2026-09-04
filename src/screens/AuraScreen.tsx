@@ -38,7 +38,11 @@ const SUGGESTIONS = [
 
 const getFriendlyAiError = (error: unknown) => {
   if (error instanceof Error) {
+    const status = (error as Error & { status?: number }).status;
     const message = error.message.toLowerCase();
+    if (status === 502 || message.includes("provider is unavailable")) {
+      return "Aura’s AI service is unavailable. Check the server’s Gemini API key and model configuration.";
+    }
     if (isNetworkFailure(error) || message.includes("failed to fetch")) {
       return "No internet connection. Please check your connection and try again.";
     }
@@ -70,7 +74,7 @@ const getFriendlyAiError = (error: unknown) => {
       message.includes("invalid ai request") ||
       message.includes("request failed")
     ) {
-      return "I couldn’t understand that request. Please try a different question.";
+      return "Aura’s AI service could not process this request. Check the server’s Gemini configuration and try again.";
     }
   }
 

@@ -34,9 +34,7 @@ export default function HomeRoute() {
             user = await getSessionUser();
           }
           if (!mounted) return;
-          if (!user)
-            throw new Error("Your saved session could not be restored.");
-          initializeForUser(user);
+          initializeForUser(user || null);
           setIsAuthenticated(true);
           return;
         }

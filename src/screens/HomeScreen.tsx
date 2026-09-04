@@ -37,12 +37,12 @@ const SECTIONS = [
   {
     title: "Productivity",
     icon: "check-square" as SectionIcon,
-    data: ["AI Assistant", "Todo List", "Habits", "Notes", "Birthdays"],
+    data: ["Todo List", "Habits", "Notes", "Birthdays"],
   },
   {
     title: "Security & Documents",
     icon: "lock" as SectionIcon,
-    data: ["Password Manager", "Documents", "Secure Notes"],
+    data: ["Password Manager", "Documents"],
   },
 ] as const;
 
@@ -56,9 +56,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleServicePress = (service: string) => {
-    if (service === "AI Assistant") {
-      router.push("/aura");
-    } else if (service === "Birthdays") {
+    if (service === "Birthdays") {
       router.push("/birthday");
     } else if (service === "Todo List") {
       router.push("/todo");
@@ -68,8 +66,6 @@ export const HomeScreen: React.FC = () => {
       router.push("/documents");
     } else if (service === "Notes") {
       router.push("/notes");
-    } else if (service === "Secure Notes") {
-      router.push("/secure-notes");
     } else if (service === "Add Expense") {
       router.push("/add-expense");
     } else if (service === "Add Income") {

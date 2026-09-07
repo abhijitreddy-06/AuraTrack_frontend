@@ -132,27 +132,9 @@ export const restoreSession = async () => {
     return false;
   }
 
-  if ((!accessToken && !refreshToken) || (accessToken && !refreshToken)) {
-    return true;
-  }
-
-  try {
-    const result = await request("/api/auth/refresh", { refreshToken });
-    await saveTokens(result);
-    return true;
-  } catch (error) {
-    if (isNetworkFailure(error)) {
-      return true;
-    }
-
-    const status = (error as Error & { status?: number }).status;
-    if ((status === 401 || status === 403) && !(await isOfflineNow())) {
-      await clearSession();
-      return false;
-    }
-
-    return true;
-  }
+  // Startup must be local-first. Network refresh belongs to the authenticated
+  // request path so a slow or unavailable backend cannot send users to auth.
+  return true;
 };
 
 export const clearSession = async () => {
@@ -199,9 +181,8 @@ export const getSessionUser = async (): Promise<SessionUser | null> => {
 
   try {
     const user = JSON.parse(storedUser) as SessionUser;
-    return typeof user.id === "string" &&
-      typeof user.app_lock_enabled === "boolean"
-      ? user
+    return typeof user.id === "string" && typeof user.email === "string"
+      ? { ...user, app_lock_enabled: user.app_lock_enabled === true }
       : null;
   } catch {
     await SecureStore.deleteItemAsync(SESSION_USER_KEY);
@@ -407,7 +388,7 @@ export const verifySession = async () => {
 
     const status = (error as Error & { status?: number }).status;
     if (status !== 401 && status !== 403) {
-      return false;
+      return true;
     }
 
     if (await isOfflineNow()) {

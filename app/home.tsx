@@ -6,7 +6,6 @@ import {
   getCurrentUser,
   getAccessToken,
   getSessionUser,
-  isNetworkFailure,
   verifySession,
 } from "../src/services/auth";
 import { useTheme } from "../src/hooks/useTheme";
@@ -32,7 +31,8 @@ export default function HomeRoute() {
             try {
               user = await getCurrentUser();
             } catch (error) {
-              if (!isNetworkFailure(error)) throw error;
+              const status = (error as Error & { status?: number }).status;
+              if (status === 401 || status === 403) throw error;
             }
           }
           if (!mounted) return;
@@ -43,8 +43,20 @@ export default function HomeRoute() {
 
         clearForLogout();
         router.replace("/auth");
-      } catch {
+      } catch (error) {
         if (!mounted) return;
+
+        const status = (error as Error & { status?: number }).status;
+        if (status !== 401 && status !== 403) {
+          const user = await getSessionUser();
+          const hasLocalSession = Boolean(user || (await getAccessToken()));
+          if (hasLocalSession) {
+            initializeForUser(user);
+            setIsAuthenticated(true);
+            return;
+          }
+        }
+
         clearForLogout();
         router.replace("/auth");
       }

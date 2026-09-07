@@ -34,7 +34,6 @@
     ],
     "android": {
       "icon": "./public/logo.png",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./public/logo_2.png",
         "backgroundColor": "#FFFFFF"
@@ -44,6 +43,7 @@
         "android.permission.USE_FINGERPRINT",
         "android.permission.POST_NOTIFICATIONS"
       ],
+      "googleServicesFile": "./google-services.json",
       "package": "com.abhijitreddy.auratrack",
       "versionCode": 2
     },

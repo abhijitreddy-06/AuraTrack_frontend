@@ -40,7 +40,12 @@ const getFriendlyAiError = (error: unknown) => {
   if (error instanceof Error) {
     const status = (error as Error & { status?: number }).status;
     const message = error.message.toLowerCase();
-    if (status === 502 || message.includes("provider is unavailable")) {
+    if (
+      status === 502 ||
+      status === 503 ||
+      message.includes("provider is unavailable") ||
+      message.includes("temporarily unavailable")
+    ) {
       return "Aura’s AI service is unavailable. Check the server’s OpenRouter API key and model configuration.";
     }
     if (isNetworkFailure(error) || message.includes("failed to fetch")) {
@@ -74,7 +79,7 @@ const getFriendlyAiError = (error: unknown) => {
       message.includes("invalid ai request") ||
       message.includes("request failed")
     ) {
-      return "Aura’s AI service could not process this request. Check the server’s Gemini configuration and try again.";
+      return "Aura’s AI service could not process this request. Check the server’s OpenRouter configuration and try again.";
     }
   }
 

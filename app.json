@@ -47,6 +47,11 @@
       "package": "com.abhijitreddy.auratrack",
       "versionCode": 2
     },
+    "expo": {
+      "android": {
+        "allowBackup": false
+      }
+    },
     "ios": {
       "bundleIdentifier": "com.abhijitreddy.auratrack"
     },

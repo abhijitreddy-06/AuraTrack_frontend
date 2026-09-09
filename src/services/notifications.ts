@@ -17,11 +17,13 @@ Notifications.setNotificationHandler({
 
 export const registerForPushNotifications = async () => {
   if (!Device.isDevice) return false;
+
   const current = await Notifications.getPermissionsAsync();
   const permission =
     current.status === "granted"
       ? current
       : await Notifications.requestPermissionsAsync();
+
   if (permission.status !== "granted") return false;
 
   await Notifications.setNotificationChannelAsync("default", {
@@ -29,23 +31,56 @@ export const registerForPushNotifications = async () => {
     importance: Notifications.AndroidImportance.HIGH,
   });
 
+  // 1. FORCE PURGE ZOMBIE TOKENS
+  // This calls FirebaseMessaging.getInstance().deleteToken() natively,
+  // destroying any restored Auto-Backup tokens and forcing a fresh sync.
+  try {
+    await Notifications.unregisterForNotificationsAsync();
+    console.info("Successfully purged existing native FCM tokens.");
+  } catch (error) {
+    console.warn("Token purge skipped or failed", error);
+  }
+
+  // 2. ACQUIRE FRESH NATIVE TOKEN
+  try {
+    const nativeDeviceToken = await Notifications.getDevicePushTokenAsync();
+    console.info("TEMPORARY Native push token diagnostic", {
+      token: String(nativeDeviceToken.data),
+      type: nativeDeviceToken.type,
+    });
+  } catch (error) {
+    console.error("TEMPORARY Native push token diagnostic FAILED", error);
+  }
+
   const projectId =
     process.env.EXPO_PUBLIC_EAS_PROJECT_ID ??
     Constants.easConfig?.projectId ??
     Constants.expoConfig?.extra?.eas?.projectId;
-  if (!projectId)
+
+  if (!projectId) {
     throw new Error("Push notifications require an EAS project ID.");
+  }
+
   console.info("Expo push registration diagnostics", {
     projectId,
     isPhysicalDevice: Device.isDevice,
     permissionStatus: permission.status,
   });
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+
+  // 3. REGISTER WITH EXPO
+  const token = (
+    await Notifications.getExpoPushTokenAsync({ projectId })
+  ).data;
+
+  console.info("TEMPORARY Expo push token diagnostic", { token });
+
   await authenticatedRequest("/api/notifications/push-token", {
     method: "POST",
     body: { token },
   });
+
   await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+
   return true;
 };
 
@@ -55,11 +90,15 @@ export const arePushNotificationsEnabled = async () =>
 
 export const disablePushNotifications = async () => {
   const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+
   if (token) {
     await authenticatedRequest("/api/notifications/push-token", {
       method: "DELETE",
       body: { token },
     });
+
     await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
+    // Also unregister natively when disabling
+    await Notifications.unregisterForNotificationsAsync();
   }
 };

@@ -35,6 +35,11 @@ export const registerForPushNotifications = async () => {
     Constants.expoConfig?.extra?.eas?.projectId;
   if (!projectId)
     throw new Error("Push notifications require an EAS project ID.");
+  console.info("Expo push registration diagnostics", {
+    projectId,
+    isPhysicalDevice: Device.isDevice,
+    permissionStatus: permission.status,
+  });
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await authenticatedRequest("/api/notifications/push-token", {
     method: "POST",

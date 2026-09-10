@@ -31,26 +31,29 @@ export const registerForPushNotifications = async () => {
     importance: Notifications.AndroidImportance.HIGH,
   });
 
-  // 1. FORCE PURGE ZOMBIE TOKENS
-  // This calls FirebaseMessaging.getInstance().deleteToken() natively,
-  // destroying any restored Auto-Backup tokens and forcing a fresh sync.
-  try {
-    await Notifications.unregisterForNotificationsAsync();
-    console.info("Successfully purged existing native FCM tokens.");
-  } catch (error) {
-    console.warn("Token purge skipped or failed", error);
-  }
+  /*
+   * TEMPORARY DEBUG: FORCE PURGE ZOMBIE TOKENS
+   * This calls FirebaseMessaging.getInstance().deleteToken() natively,
+   * destroying any restored Auto-Backup tokens and forcing a fresh sync.
+   *
+   * try {
+   *   await Notifications.unregisterForNotificationsAsync();
+   *   console.info("Successfully purged existing native FCM tokens.");
+   * } catch (error) {
+   *   console.warn("Token purge skipped or failed", error);
+   * }
+   */
 
   // 2. ACQUIRE FRESH NATIVE TOKEN
-  try {
-    const nativeDeviceToken = await Notifications.getDevicePushTokenAsync();
-    console.info("TEMPORARY Native push token diagnostic", {
-      token: String(nativeDeviceToken.data),
-      type: nativeDeviceToken.type,
-    });
-  } catch (error) {
-    console.error("TEMPORARY Native push token diagnostic FAILED", error);
-  }
+  // try {
+  //   const nativeDeviceToken = await Notifications.getDevicePushTokenAsync();
+  //   console.info("TEMPORARY Native push token diagnostic", {
+  //     token: String(nativeDeviceToken.data),
+  //     type: nativeDeviceToken.type,
+  //   });
+  // } catch (error) {
+  //   console.error("TEMPORARY Native push token diagnostic FAILED", error);
+  // }
 
   const projectId =
     process.env.EXPO_PUBLIC_EAS_PROJECT_ID ??
@@ -61,18 +64,18 @@ export const registerForPushNotifications = async () => {
     throw new Error("Push notifications require an EAS project ID.");
   }
 
-  console.info("Expo push registration diagnostics", {
-    projectId,
-    isPhysicalDevice: Device.isDevice,
-    permissionStatus: permission.status,
-  });
+  // console.info("Expo push registration diagnostics", {
+  //   projectId,
+  //   isPhysicalDevice: Device.isDevice,
+  //   permissionStatus: permission.status,
+  // });
 
   // 3. REGISTER WITH EXPO
   const token = (
     await Notifications.getExpoPushTokenAsync({ projectId })
   ).data;
 
-  console.info("TEMPORARY Expo push token diagnostic", { token });
+  //console.info("TEMPORARY Expo push token diagnostic", { token });
 
   await authenticatedRequest("/api/notifications/push-token", {
     method: "POST",

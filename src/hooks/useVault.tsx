@@ -254,26 +254,37 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
           );
         }
 
-        // ── v1 fast path ───────────────────────────────────────────────────
-        if (currentMeta.vault_version === "v1") {
+        // ── v1 fast path (existing v1 users who have not migrated) ────────
+        // A brand-new user starts with vault_version='v1' and kdf_salt=null.
+        // That user must be initialized as v2 immediately — NOT treated as
+        // a legacy v1 user. Distinguish by presence of kdf_salt:
+        //   kdf_salt IS NULL   → never set up → do v2 init below
+        //   kdf_salt NOT NULL  → genuine v1 with server-side encryption → fast path
+        if (
+          currentMeta.vault_version === "v1" &&
+          currentMeta.kdf_salt !== null
+        ) {
           setIsUnlocked(true);
           return true;
         }
 
-        // ── v2: must have KDF metadata ─────────────────────────────────────
-        if (!currentMeta.kdf_salt || !currentMeta.kdf_params) {
-          throw new VaultCryptoError(
-            "Missing KDF parameters for client-side vault",
-            "INVALID_PARAMS",
-          );
+        // New user (vault_version='v1', kdf_salt=null) falls through to v2 init.
+        // After initializeVault() the backend flips their vault_version to 'v2'.
+
+        // ── v2: ensure we have KDF metadata ────────────────────────────────
+        // Existing v2 users: kdf_salt/params come from the backend.
+        // Brand-new users (kdf_salt=null): generate them now client-side.
+        // The generated salt is sent to the backend in initializeVault().
+        let kdfSalt = currentMeta.kdf_salt;
+        let kdfParams = currentMeta.kdf_params;
+
+        if (!kdfSalt || !kdfParams) {
+          kdfSalt = await generateSalt();
+          kdfParams = await getDefaultKdfParams();
         }
 
         // Step 1 — Derive KEK via Argon2id (password never leaves this function).
-        const derivedKek = await deriveKEK(
-          password,
-          currentMeta.kdf_salt,
-          currentMeta.kdf_params,
-        );
+        const derivedKek = await deriveKEK(password, kdfSalt, kdfParams);
 
         // Replace any stale KEK in memory.
         wipeBytes(kekRef.current);
@@ -351,8 +362,8 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
           recoveryKek = null;
 
           await initializeVault({
-            kdf_salt: currentMeta.kdf_salt,
-            kdf_params: currentMeta.kdf_params,
+            kdf_salt: kdfSalt,
+            kdf_params: kdfParams,
             wrapped_dek: wrappedDek,
             wrapped_dek_nonce: nonce,
             recovery_kdf_salt: recSalt,
@@ -648,7 +659,7 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
       let activeDek: Uint8Array | null = null;
 
       try {
-        onProgress?.(10, "Initializing secure client-side vault...");
+        onProgress?.(10, "Deriving encryption keys...");
 
         const res = await getUserVaultMetadata();
         const currentMeta = res.data;
@@ -671,6 +682,10 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
         activeKek = await deriveKEK(password, salt, params);
 
         let generatedRecoveryKey: string | null = null;
+        let recSalt = currentMeta.recovery_kdf_salt;
+        let recParams = currentMeta.recovery_kdf_params;
+        let recWrappedDek = currentMeta.recovery_wrapped_dek;
+        let recWrappedDekNonce = currentMeta.recovery_wrapped_dek_nonce;
 
         if (wrappedDek && wrappedDekNonce) {
           try {
@@ -681,85 +696,62 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
               "UNWRAP_FAILED",
             );
           }
-
-          if (!currentMeta.recovery_wrapped_dek) {
-            const { formattedKey, normalizedKey } = await generateRecoveryKey();
-            generatedRecoveryKey = formattedKey;
-            const recSalt = await generateSalt();
-            const recParams = await getDefaultKdfParams();
-            const recKek = await deriveKEK(normalizedKey, recSalt, recParams);
-            const recWrapped = await wrapDEK(activeDek, recKek);
-            wipeBytes(recKek);
-
-            await setVaultRecoveryMetadata({
-              recovery_kdf_salt: recSalt,
-              recovery_kdf_params: recParams,
-              recovery_wrapped_dek: recWrapped.wrappedDek,
-              recovery_wrapped_dek_nonce: recWrapped.nonce,
-            });
-          }
         } else {
           activeDek = await generateDEK();
           const wrapped = await wrapDEK(activeDek, activeKek);
           wrappedDek = wrapped.wrappedDek;
           wrappedDekNonce = wrapped.nonce;
+        }
 
-          // Phase 8: Generate recovery key and wrap activeDek with recovery KEK
+        onProgress?.(25, "Securing emergency recovery key...");
+
+        if (!recWrappedDek || !recSalt || !recParams) {
           const { formattedKey, normalizedKey } = await generateRecoveryKey();
           generatedRecoveryKey = formattedKey;
-          const recSalt = await generateSalt();
-          const recParams = await getDefaultKdfParams();
+          recSalt = await generateSalt();
+          recParams = await getDefaultKdfParams();
           const recKek = await deriveKEK(normalizedKey, recSalt, recParams);
           const recWrapped = await wrapDEK(activeDek, recKek);
           wipeBytes(recKek);
+          recWrappedDek = recWrapped.wrappedDek;
+          recWrappedDekNonce = recWrapped.nonce;
+        }
 
-          const startRes = await startVaultMigration({
-            kdf_salt: salt,
-            kdf_params: params,
-            wrapped_dek: wrappedDek,
-            wrapped_dek_nonce: wrappedDekNonce,
-            recovery_kdf_salt: recSalt,
-            recovery_kdf_params: recParams,
-            recovery_wrapped_dek: recWrapped.wrappedDek,
-            recovery_wrapped_dek_nonce: recWrapped.nonce,
-          });
+        onProgress?.(35, "Registering vault migration session...");
 
-          if (startRes.data.alreadyStarted) {
-            wipeBytes(activeDek);
-            activeDek = null;
+        // Always call startVaultMigration to ensure backend sets migration_status = 'in_progress'
+        const startRes = await startVaultMigration({
+          kdf_salt: salt,
+          kdf_params: params,
+          wrapped_dek: wrappedDek,
+          wrapped_dek_nonce: wrappedDekNonce,
+          recovery_kdf_salt: recSalt,
+          recovery_kdf_params: recParams,
+          recovery_wrapped_dek: recWrappedDek,
+          recovery_wrapped_dek_nonce: recWrappedDekNonce,
+        });
+
+        if (startRes.data.alreadyStarted) {
+          // Re-derive if server had an authoritative earlier salt/dek
+          if (startRes.data.kdf_salt !== salt) {
             wipeBytes(activeKek);
             activeKek = await deriveKEK(
               password,
               startRes.data.kdf_salt,
               startRes.data.kdf_params,
             );
+          }
+          if (startRes.data.wrapped_dek !== wrappedDek) {
+            wipeBytes(activeDek);
             activeDek = await unwrapDEK(
               startRes.data.wrapped_dek,
               startRes.data.wrapped_dek_nonce,
               activeKek,
             );
-
-            if (!startRes.data.recovery_wrapped_dek) {
-              const { formattedKey: fKey, normalizedKey: nKey } =
-                await generateRecoveryKey();
-              generatedRecoveryKey = fKey;
-              const rSalt = await generateSalt();
-              const rParams = await getDefaultKdfParams();
-              const rKek = await deriveKEK(nKey, rSalt, rParams);
-              const rWrapped = await wrapDEK(activeDek, rKek);
-              wipeBytes(rKek);
-
-              await setVaultRecoveryMetadata({
-                recovery_kdf_salt: rSalt,
-                recovery_kdf_params: rParams,
-                recovery_wrapped_dek: rWrapped.wrappedDek,
-                recovery_wrapped_dek_nonce: rWrapped.nonce,
-              });
-            }
           }
         }
 
-        onProgress?.(30, "Retrieving saved passwords for encryption...");
+        onProgress?.(45, "Retrieving saved passwords for encryption...");
 
         const exportRes = await exportV1EntriesForMigration();
         const entries = exportRes.data;
@@ -845,7 +837,7 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
         wipeBytes(activeDek);
         const msg = err instanceof Error ? err.message : "Migration failed";
         setError(msg);
-        return false;
+        throw err;
       } finally {
         setIsLoading(false);
       }

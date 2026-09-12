@@ -1,7 +1,102 @@
-import sodium from "libsodium-wrappers-sumo";
+/**
+ * vaultCrypto.ts — AuraTrack v2 vault cryptographic primitives.
+ *
+ * Replaces libsodium-wrappers-sumo (WASM) with pure-JS @noble libraries
+ * that are compatible with React Native's Hermes engine:
+ *
+ *   @noble/hashes  →  Argon2id key derivation (no WASM, pure JS)
+ *   @noble/ciphers →  XChaCha20-Poly1305 AEAD (no WASM, pure JS)
+ *
+ * Wire-format compatibility:
+ *   - XChaCha20-Poly1305: same algorithm, key (32 B), nonce (24 B),
+ *     ciphertext || 16-byte tag — binary-identical to libsodium output.
+ *   - Argon2id: same algorithm with the same t/m/p parameters gives the
+ *     same derived key as libsodium's crypto_pwhash.
+ *   - Salt: 16 bytes, base64url-no-padding — same as before.
+ *   - Nonce: 24 bytes, base64url-no-padding — same as before.
+ *   - DEK: 32 bytes, base64url-no-padding — same as before.
+ *
+ * Randomness:
+ *   crypto.getRandomValues is polyfilled by react-native-get-random-values
+ *   (imported first in index.js) which calls Android SecureRandom /
+ *   iOS SecRandomCopyBytes under the hood.
+ *
+ * Existing v2 users' wrapped DEKs and encrypted entries are fully
+ * decryptable with this implementation — no re-encryption required.
+ */
+
+import { argon2id } from "@noble/hashes/argon2.js";
+import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
+import { utf8ToBytes } from "@noble/hashes/utils.js";
+
+// ─── Libsodium constant equivalents ──────────────────────────────────────────
+// These values are identical to libsodium's constants to maintain
+// compatibility with all data already stored in the database.
+
+/** Argon2id OWASP interactive iterations (= libsodium OPSLIMIT_INTERACTIVE) */
+const ARGON2ID_T_INTERACTIVE = 2;
+
+/**
+ * Argon2id OWASP interactive memory — libsodium stores memlimit in BYTES
+ * (67108864 = 64 MB). @noble/hashes argon2id takes memory in KIBIBYTES,
+ * so we divide by 1024 (= 65536 KiB).
+ */
+const ARGON2ID_M_INTERACTIVE_KB = 67108864 / 1024; // 65536
+
+/** Argon2id parallelism (libsodium always uses 1). */
+const ARGON2ID_P = 1;
+
+/** libsodium crypto_pwhash_ALG_ARGON2ID13 constant value */
+export const ARGON2ID13_ALGO_CONSTANT = 2;
+
+/** Salt size in bytes: libsodium crypto_pwhash_SALTBYTES = 16 */
+const SALT_BYTES = 16;
+
+/** Nonce size in bytes: libsodium crypto_aead_xchacha20poly1305_ietf_NPUBBYTES = 24 */
+const NONCE_BYTES = 24;
+
+/** DEK/key size in bytes: libsodium crypto_aead_xchacha20poly1305_ietf_KEYBYTES = 32 */
+const KEY_BYTES = 32;
+
+// ─── Base64url (no padding) helpers ──────────────────────────────────────────
+// btoa / atob are available in Hermes. We replicate libsodium's
+// base64_variants.URLSAFE_NO_PADDING: replace + → -, / → _, strip =.
+
+const toBase64Url = (bytes: Uint8Array): string => {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+};
+
+const fromBase64Url = (str: string): Uint8Array => {
+  // Restore standard base64 characters and add padding.
+  const b64 =
+    str.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (str.length % 4)) % 4);
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const toHex = (bytes: Uint8Array): string =>
+  Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+// ─── Public types ─────────────────────────────────────────────────────────────
 
 /**
  * Vault KDF Parameters shape matching the database schema in user_vault_keys.
+ * Kept identical to the libsodium-era shape for full database compatibility.
+ *
+ * opslimit = Argon2id t (iterations)
+ * memlimit = Argon2id memory in BYTES (divide by 1024 for @noble)
+ * algo     = 2 (ARGON2ID13 constant, kept for schema compatibility)
  */
 export type VaultKdfParams = {
   opslimit: number;
@@ -38,45 +133,55 @@ export class VaultCryptoError extends Error {
   }
 }
 
-/**
- * Ensure libsodium is fully loaded and ready before any cryptographic operations.
- */
-export const ensureSodiumReady = async (): Promise<typeof sodium> => {
-  await sodium.ready;
-  return sodium;
-};
+// ─── Sodium-compat shim ───────────────────────────────────────────────────────
 
 /**
- * Returns the default Argon2id KDF parameters matching OWASP interactive recommendations.
+ * No-op: @noble libraries need no async initialization.
+ * Kept for API compatibility with callers that await ensureSodiumReady().
  */
-export const getDefaultKdfParams = async (): Promise<VaultKdfParams> => {
-  const s = await ensureSodiumReady();
-  return {
-    opslimit: s.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    memlimit: s.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-    algo: s.crypto_pwhash_ALG_ARGON2ID13,
-  };
+export const ensureSodiumReady = async (): Promise<void> => {
+  // @noble/hashes and @noble/ciphers are synchronous pure-JS — no WASM init.
 };
 
-/**
- * Generate a cryptographically secure random salt for Argon2id (16 bytes, base64url encoded).
- */
-export const generateSalt = async (): Promise<string> => {
-  const s = await ensureSodiumReady();
-  const saltBytes = s.randombytes_buf(s.crypto_pwhash_SALTBYTES);
-  return s.to_base64(saltBytes, s.base64_variants.URLSAFE_NO_PADDING);
+// ─── Random bytes ─────────────────────────────────────────────────────────────
+
+/** Fill a Uint8Array with cryptographically secure random bytes. */
+const randomBytes = (n: number): Uint8Array => {
+  const buf = new Uint8Array(n);
+  // crypto.getRandomValues is polyfilled by react-native-get-random-values
+  // in index.js (imported first, before everything else).
+  crypto.getRandomValues(buf);
+  return buf;
 };
 
+// ─── KDF params ───────────────────────────────────────────────────────────────
+
 /**
- * Generate a cryptographically secure random nonce for XChaCha20-Poly1305 (24 bytes, base64url encoded).
+ * Returns the default Argon2id KDF parameters matching OWASP interactive
+ * recommendations — identical values to what libsodium produced, so
+ * existing salts/wrapped DEKs remain fully decryptable.
  */
-export const generateNonce = async (): Promise<string> => {
-  const s = await ensureSodiumReady();
-  const nonceBytes = s.randombytes_buf(
-    s.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES,
-  );
-  return s.to_base64(nonceBytes, s.base64_variants.URLSAFE_NO_PADDING);
-};
+export const getDefaultKdfParams = async (): Promise<VaultKdfParams> => ({
+  opslimit: ARGON2ID_T_INTERACTIVE,
+  memlimit: ARGON2ID_M_INTERACTIVE_KB * 1024, // stored as bytes = 67108864
+  algo: ARGON2ID13_ALGO_CONSTANT,
+});
+
+// ─── Salt / Nonce / DEK generation ───────────────────────────────────────────
+
+/**
+ * Generate a cryptographically secure random salt for Argon2id
+ * (16 bytes, base64url-no-padding encoded).
+ */
+export const generateSalt = async (): Promise<string> =>
+  toBase64Url(randomBytes(SALT_BYTES));
+
+/**
+ * Generate a cryptographically secure random nonce for XChaCha20-Poly1305
+ * (24 bytes, base64url-no-padding encoded).
+ */
+export const generateNonce = async (): Promise<string> =>
+  toBase64Url(randomBytes(NONCE_BYTES));
 
 /**
  * Generate a cryptographically secure random 32-byte Data Encryption Key (DEK).
@@ -88,23 +193,27 @@ export const generateNonce = async (): Promise<string> => {
  *
  * @returns Uint8Array of exactly 32 random bytes.
  */
-export const generateDEK = async (): Promise<Uint8Array> => {
-  const s = await ensureSodiumReady();
-  // crypto_aead_xchacha20poly1305_ietf_KEYBYTES = 32
-  return s.randombytes_buf(s.crypto_aead_xchacha20poly1305_ietf_KEYBYTES);
-};
+export const generateDEK = async (): Promise<Uint8Array> =>
+  randomBytes(KEY_BYTES);
+
+// ─── Key Derivation ───────────────────────────────────────────────────────────
 
 /**
- * Derive a 32-byte Key Encryption Key (KEK) using Argon2id via libsodium.
+ * Derive a 32-byte Key Encryption Key (KEK) using Argon2id via @noble/hashes.
  *
  * Requirements:
  * - Deterministic for the same (password, salt, params).
  * - Runs completely client-side.
  * - Plaintext password and derived key are NEVER sent over the network or logged.
  *
+ * Parameter mapping from libsodium schema:
+ *   kdf_params.opslimit → t  (iterations)
+ *   kdf_params.memlimit → m  (memory in KB; schema stores bytes, so ÷ 1024)
+ *   kdf_params.algo     → ignored (always Argon2id)
+ *
  * @param password The user's plaintext password.
  * @param saltBase64 The base64url-encoded per-user salt.
- * @param params The Argon2id cost parameters.
+ * @param params The Argon2id cost parameters (libsodium schema shape).
  * @returns Uint8Array of 32 bytes representing the KEK.
  */
 export const deriveKEK = async (
@@ -131,11 +240,9 @@ export const deriveKEK = async (
     );
   }
 
-  const s = await ensureSodiumReady();
-
   let saltBytes: Uint8Array;
   try {
-    saltBytes = s.from_base64(saltBase64, s.base64_variants.URLSAFE_NO_PADDING);
+    saltBytes = fromBase64Url(saltBase64);
   } catch {
     throw new VaultCryptoError(
       "Failed to decode base64url salt",
@@ -143,22 +250,22 @@ export const deriveKEK = async (
     );
   }
 
-  if (saltBytes.length !== s.crypto_pwhash_SALTBYTES) {
+  if (saltBytes.length !== SALT_BYTES) {
     throw new VaultCryptoError(
-      `Salt must be exactly ${s.crypto_pwhash_SALTBYTES} bytes`,
+      `Salt must be exactly ${SALT_BYTES} bytes`,
       "INVALID_SALT",
     );
   }
 
   try {
-    return s.crypto_pwhash(
-      32,
-      password,
-      saltBytes,
-      params.opslimit,
-      params.memlimit,
-      params.algo,
-    );
+    // memlimit in schema is bytes; @noble argon2id expects kibibytes.
+    const memKb = Math.floor(params.memlimit / 1024);
+    return argon2id(utf8ToBytes(password), saltBytes, {
+      t: params.opslimit,
+      m: memKb,
+      p: ARGON2ID_P,
+      dkLen: KEY_BYTES,
+    });
   } catch (error) {
     throw new VaultCryptoError(
       error instanceof Error ? error.message : "Argon2id key derivation failed",
@@ -167,12 +274,15 @@ export const deriveKEK = async (
   }
 };
 
+// ─── DEK Wrap / Unwrap ────────────────────────────────────────────────────────
+
 /**
  * Unwrap an encrypted Data Encryption Key (DEK) using the derived KEK.
- * Uses libsodium's authenticated encryption: XChaCha20-Poly1305.
+ * Uses XChaCha20-Poly1305 via @noble/ciphers — wire-format identical to
+ * libsodium crypto_aead_xchacha20poly1305_ietf_decrypt.
  *
- * @param wrappedDekBase64 The base64url-encoded wrapped DEK ciphertext.
- * @param nonceBase64 The base64url-encoded nonce used to wrap the DEK.
+ * @param wrappedDekBase64 The base64url-encoded wrapped DEK ciphertext (includes 16-byte tag).
+ * @param nonceBase64 The base64url-encoded 24-byte nonce used to wrap the DEK.
  * @param kek The 32-byte derived KEK.
  * @returns Uint8Array of 32 bytes representing the unwrapped DEK.
  */
@@ -181,17 +291,12 @@ export const unwrapDEK = async (
   nonceBase64: string,
   kek: Uint8Array,
 ): Promise<Uint8Array> => {
-  const s = await ensureSodiumReady();
-
   let ciphertext: Uint8Array;
   let nonce: Uint8Array;
 
   try {
-    ciphertext = s.from_base64(
-      wrappedDekBase64,
-      s.base64_variants.URLSAFE_NO_PADDING,
-    );
-    nonce = s.from_base64(nonceBase64, s.base64_variants.URLSAFE_NO_PADDING);
+    ciphertext = fromBase64Url(wrappedDekBase64);
+    nonce = fromBase64Url(nonceBase64);
   } catch {
     throw new VaultCryptoError(
       "Failed to decode base64url wrapped DEK or nonce",
@@ -200,13 +305,8 @@ export const unwrapDEK = async (
   }
 
   try {
-    return s.crypto_aead_xchacha20poly1305_ietf_decrypt(
-      null,
-      ciphertext,
-      null,
-      nonce,
-      kek,
-    );
+    const cipher = xchacha20poly1305(kek, nonce);
+    return cipher.decrypt(ciphertext);
   } catch {
     throw new VaultCryptoError(
       "Failed to unwrap DEK. Password may be incorrect or ciphertext was corrupted.",
@@ -218,28 +318,23 @@ export const unwrapDEK = async (
 /**
  * Wrap a DEK with a KEK using XChaCha20-Poly1305.
  * Used when setting up a v2 vault or rotating the DEK.
+ * Output is wire-format identical to libsodium crypto_aead_xchacha20poly1305_ietf_encrypt.
  */
 export const wrapDEK = async (
   dek: Uint8Array,
   kek: Uint8Array,
 ): Promise<{ wrappedDek: string; nonce: string }> => {
-  const s = await ensureSodiumReady();
-  const nonceBytes = s.randombytes_buf(
-    s.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES,
-  );
-  const ciphertext = s.crypto_aead_xchacha20poly1305_ietf_encrypt(
-    dek,
-    null,
-    null,
-    nonceBytes,
-    kek,
-  );
+  const nonceBytes = randomBytes(NONCE_BYTES);
+  const cipher = xchacha20poly1305(kek, nonceBytes);
+  const ciphertext = cipher.encrypt(dek); // ciphertext || 16-byte tag
 
   return {
-    wrappedDek: s.to_base64(ciphertext, s.base64_variants.URLSAFE_NO_PADDING),
-    nonce: s.to_base64(nonceBytes, s.base64_variants.URLSAFE_NO_PADDING),
+    wrappedDek: toBase64Url(ciphertext),
+    nonce: toBase64Url(nonceBytes),
   };
 };
+
+// ─── Field Encryption / Decryption ───────────────────────────────────────────
 
 /**
  * Encrypt a plaintext string field using the DEK via XChaCha20-Poly1305.
@@ -263,35 +358,19 @@ export const encryptField = async (
   if (typeof plaintext !== "string") {
     throw new VaultCryptoError("plaintext must be a string", "ENCRYPT_FAILED");
   }
-  if (!dek || dek.length !== 32) {
+  if (!dek || dek.length !== KEY_BYTES) {
     throw new VaultCryptoError(
       "DEK must be a 32-byte Uint8Array",
       "ENCRYPT_FAILED",
     );
   }
 
-  const s = await ensureSodiumReady();
-
-  const nonce = s.randombytes_buf(
-    s.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES,
-  );
-
   try {
-    const ciphertext = s.crypto_aead_xchacha20poly1305_ietf_encrypt(
-      s.from_string(plaintext),
-      null,
-      null,
-      nonce,
-      dek,
-    );
+    const nonce = randomBytes(NONCE_BYTES);
+    const cipher = xchacha20poly1305(dek, nonce);
+    const ciphertext = cipher.encrypt(utf8ToBytes(plaintext));
 
-    const nonceB64 = s.to_base64(nonce, s.base64_variants.URLSAFE_NO_PADDING);
-    const ciphertextB64 = s.to_base64(
-      ciphertext,
-      s.base64_variants.URLSAFE_NO_PADDING,
-    );
-
-    return `${nonceB64}.${ciphertextB64}`;
+    return `${toBase64Url(nonce)}.${toBase64Url(ciphertext)}`;
   } catch (error) {
     throw new VaultCryptoError(
       error instanceof Error ? error.message : "Encryption failed",
@@ -319,14 +398,12 @@ export const decryptField = async (
       "DECRYPT_FAILED",
     );
   }
-  if (!dek || dek.length !== 32) {
+  if (!dek || dek.length !== KEY_BYTES) {
     throw new VaultCryptoError(
       "DEK must be a 32-byte Uint8Array",
       "DECRYPT_FAILED",
     );
   }
-
-  const s = await ensureSodiumReady();
 
   const dotIndex = encoded.indexOf(".");
   const nonceB64 = encoded.slice(0, dotIndex);
@@ -336,11 +413,8 @@ export const decryptField = async (
   let ciphertext: Uint8Array;
 
   try {
-    nonce = s.from_base64(nonceB64, s.base64_variants.URLSAFE_NO_PADDING);
-    ciphertext = s.from_base64(
-      ciphertextB64,
-      s.base64_variants.URLSAFE_NO_PADDING,
-    );
+    nonce = fromBase64Url(nonceB64);
+    ciphertext = fromBase64Url(ciphertextB64);
   } catch {
     throw new VaultCryptoError(
       "Failed to decode base64url ciphertext or nonce",
@@ -349,14 +423,9 @@ export const decryptField = async (
   }
 
   try {
-    const plainBytes = s.crypto_aead_xchacha20poly1305_ietf_decrypt(
-      null,
-      ciphertext,
-      null,
-      nonce,
-      dek,
-    );
-    return s.to_string(plainBytes);
+    const cipher = xchacha20poly1305(dek, nonce);
+    const plainBytes = cipher.decrypt(ciphertext);
+    return new TextDecoder().decode(plainBytes);
   } catch {
     throw new VaultCryptoError(
       "Decryption failed — wrong DEK or tampered ciphertext.",
@@ -364,6 +433,8 @@ export const decryptField = async (
     );
   }
 };
+
+// ─── Memory wipe ──────────────────────────────────────────────────────────────
 
 /**
  * Safely wipe sensitive byte arrays from memory when no longer needed.
@@ -374,18 +445,19 @@ export const wipeBytes = (buffer: Uint8Array | null | undefined): void => {
   }
 };
 
+// ─── DEK encode/decode for SecureStore ───────────────────────────────────────
+
 /**
  * Encode a 32-byte DEK to a base64url string for SecureStore persistence.
  */
 export const encodeDEK = async (dek: Uint8Array): Promise<string> => {
-  if (!dek || dek.length !== 32) {
+  if (!dek || dek.length !== KEY_BYTES) {
     throw new VaultCryptoError(
       "DEK must be a 32-byte Uint8Array",
       "INIT_FAILED",
     );
   }
-  const s = await ensureSodiumReady();
-  return s.to_base64(dek, s.base64_variants.URLSAFE_NO_PADDING);
+  return toBase64Url(dek);
 };
 
 /**
@@ -398,17 +470,16 @@ export const decodeAndValidateDEK = async (
   if (typeof encoded !== "string" || !encoded.trim()) {
     throw new VaultCryptoError("Invalid DEK encoding", "INIT_FAILED");
   }
-  const s = await ensureSodiumReady();
   let bytes: Uint8Array;
   try {
-    bytes = s.from_base64(encoded.trim(), s.base64_variants.URLSAFE_NO_PADDING);
+    bytes = fromBase64Url(encoded.trim());
   } catch {
     throw new VaultCryptoError("Failed to decode base64url DEK", "INIT_FAILED");
   }
-  if (bytes.length !== s.crypto_aead_xchacha20poly1305_ietf_KEYBYTES) {
+  if (bytes.length !== KEY_BYTES) {
     wipeBytes(bytes);
     throw new VaultCryptoError(
-      `DEK must be exactly ${s.crypto_aead_xchacha20poly1305_ietf_KEYBYTES} bytes, got ${bytes.length}`,
+      `DEK must be exactly ${KEY_BYTES} bytes, got ${bytes.length}`,
       "INIT_FAILED",
     );
   }
@@ -426,9 +497,8 @@ export const generateRecoveryKey = async (): Promise<{
   formattedKey: string;
   normalizedKey: string;
 }> => {
-  const s = await ensureSodiumReady();
-  const rawBytes = s.randombytes_buf(32);
-  const hex = s.to_hex(rawBytes).toUpperCase();
+  const rawBytes = randomBytes(32);
+  const hex = toHex(rawBytes).toUpperCase();
   const chunks = hex.match(/.{1,4}/g) || [];
   const formattedKey = chunks.join("-");
   return {

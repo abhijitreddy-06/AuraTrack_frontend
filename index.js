@@ -9,7 +9,8 @@
  * module initialises — without it the app crashes on Hermes with:
  *   "globalThis.crypto.getRandomValues is not available"
  */
-import "react-native-get-random-values";
+import 'react-native-get-random-values';
 
 // Chain into the standard expo-router entry point.
-import "expo-router/entry";
+import 'expo-router/entry';
+

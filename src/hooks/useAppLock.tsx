@@ -25,6 +25,7 @@ import {
   setSessionUserAppLockEnabled,
   type SessionUser,
 } from "../services/auth";
+import { removeBiometricDEK } from "../services/crypto/vaultBiometrics";
 
 const BACKGROUND_TIMEOUT_MS = 2 * 60 * 1000;
 
@@ -111,6 +112,9 @@ export const AppLockProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   const clearForLogout = useCallback(() => {
+    if (userIdRef.current) {
+      void removeBiometricDEK(userIdRef.current);
+    }
     clearTimer();
     backgroundedAt.current = null;
     userIdRef.current = null;
@@ -135,6 +139,7 @@ export const AppLockProvider: React.FC<{ children: ReactNode }> = ({
           backgroundedAt.current = null;
           lockedRef.current = false;
           setIsLocked(false);
+          await removeBiometricDEK(userIdRef.current);
         }
         return true;
       } catch {

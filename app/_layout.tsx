@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { ThemeProvider } from "../src/hooks/useTheme";
 import { useTheme } from "../src/hooks/useTheme";
 import { AppLockProvider } from "../src/hooks/useAppLock";
+import { VaultProvider } from "../src/hooks/useVault";
 import { subscribeToNetworkChanges } from "../src/offline/network";
 import { syncPendingQueue } from "../src/offline/cache";
 
@@ -15,7 +16,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AppLockProvider>
-        <RootNavigator />
+        <VaultProvider>
+          <RootNavigator />
+        </VaultProvider>
       </AppLockProvider>
     </ThemeProvider>
   );

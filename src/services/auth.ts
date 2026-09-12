@@ -31,6 +31,7 @@ export type SessionUser = {
   fullname: string;
   email: string;
   app_lock_enabled: boolean;
+  vault_version?: "v1" | "v2";
 };
 
 type AuthResponse = {
@@ -152,6 +153,11 @@ export const clearSession = async () => {
 
   if (userId) {
     await clearUserOfflineData(userId);
+    try {
+      await SecureStore.deleteItemAsync(`auratrack.vault.dek.${userId}`);
+    } catch {
+      // Ignore errors if key does not exist
+    }
   }
 
   await Promise.all([
@@ -182,7 +188,11 @@ export const getSessionUser = async (): Promise<SessionUser | null> => {
   try {
     const user = JSON.parse(storedUser) as SessionUser;
     return typeof user.id === "string" && typeof user.email === "string"
-      ? { ...user, app_lock_enabled: user.app_lock_enabled === true }
+      ? {
+          ...user,
+          app_lock_enabled: user.app_lock_enabled === true,
+          vault_version: user.vault_version === "v2" ? "v2" : "v1",
+        }
       : null;
   } catch {
     await SecureStore.deleteItemAsync(SESSION_USER_KEY);
@@ -196,6 +206,15 @@ export const setSessionUserAppLockEnabled = async (appLockEnabled: boolean) => {
   await SecureStore.setItemAsync(
     SESSION_USER_KEY,
     JSON.stringify({ ...user, app_lock_enabled: appLockEnabled }),
+  );
+};
+
+export const setSessionUserVaultVersion = async (vaultVersion: "v1" | "v2") => {
+  const user = await getSessionUser();
+  if (!user) return;
+  await SecureStore.setItemAsync(
+    SESSION_USER_KEY,
+    JSON.stringify({ ...user, vault_version: vaultVersion }),
   );
 };
 

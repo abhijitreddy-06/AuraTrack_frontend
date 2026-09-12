@@ -311,7 +311,7 @@ export const AddExpenseScreen: React.FC = () => {
             <Feather name="search" size={18} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.textPrimary }]}
-              placeholder="Search by name or choose a date"
+              placeholder="Search by name or date"
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}

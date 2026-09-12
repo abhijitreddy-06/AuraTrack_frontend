@@ -444,40 +444,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onSuccess }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Divider + Google */}
-          <View style={styles.footer}>
-            <View style={styles.dividerRow}>
-              <View
-                style={[
-                  styles.dividerLine,
-                  { backgroundColor: colors.divider },
-                ]}
-              />
-              <Text
-                style={[styles.dividerText, { color: colors.textSecondary }]}
-              >
-                or continue with
-              </Text>
-              <View
-                style={[
-                  styles.dividerLine,
-                  { backgroundColor: colors.divider },
-                ]}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.googleButton, { borderColor: colors.divider }]}
-              activeOpacity={0.7}
-            >
-              <GoogleMark />
-              <Text
-                style={[styles.googleButtonText, { color: colors.textPrimary }]}
-              >
-                Continue with Google
-              </Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
       {isSubmitting && <AuthLoadingOverlay />}

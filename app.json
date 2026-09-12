@@ -20,7 +20,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./public/logo_2.png",
+          "icon": "./public/notification_icon.png",
           "color": "#4F8CFF"
         }
       ],
@@ -33,6 +33,7 @@
       "expo-sqlite"
     ],
     "android": {
+      "allowBackup": false,
       "icon": "./public/logo.png",
       "adaptiveIcon": {
         "foregroundImage": "./public/logo_2.png",
@@ -46,11 +47,6 @@
       "googleServicesFile": "./google-services.json",
       "package": "com.abhijitreddy.auratrack",
       "versionCode": 2
-    },
-    "expo": {
-      "android": {
-        "allowBackup": false
-      }
     },
     "ios": {
       "bundleIdentifier": "com.abhijitreddy.auratrack"

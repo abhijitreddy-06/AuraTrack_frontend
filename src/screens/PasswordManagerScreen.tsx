@@ -591,7 +591,7 @@ export const PasswordManagerScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.modalKeyboardAvoiding}
           >
             <View
@@ -600,220 +600,229 @@ export const PasswordManagerScreen: React.FC = () => {
                 { backgroundColor: colors.secondaryBackground },
               ]}
             >
-              {migrationSuccess ? (
-                /* Success Screen */
-                <View style={styles.migrationSuccessContainer}>
-                  <View
-                    style={[
-                      styles.unlockIconCircle,
-                      { backgroundColor: "#10B9811A" },
-                    ]}
-                  >
-                    <Feather name="check-circle" size={40} color="#10B981" />
-                  </View>
-                  <Text
-                    style={[
-                      styles.unlockTitle,
-                      { color: colors.textPrimary, marginTop: spacing.sm },
-                    ]}
-                  >
-                    Vault Security Upgraded
-                  </Text>
-                  <Text
-                    style={[
-                      styles.unlockSubtitle,
-                      {
-                        color: colors.textSecondary,
-                        marginVertical: spacing.md,
-                      },
-                    ]}
-                  >
-                    Your vault is now protected with client-side encryption.
-                    {"\n\n"}
-                    Your saved passwords are encrypted on your device before
-                    being stored.
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.formButton,
-                      styles.submitButton,
-                      { backgroundColor: colors.primary, width: "100%" },
-                    ]}
-                    onPress={() => {
-                      setShowMigrationModal(false);
-                      setMigrationSuccess(false);
-                    }}
-                  >
-                    <Text style={styles.submitButtonText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : isMigrating ? (
-                /* Migration in Progress */
-                <View style={styles.migrationProgressContainer}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text
-                    style={[
-                      styles.unlockTitle,
-                      { color: colors.textPrimary, marginTop: spacing.lg },
-                    ]}
-                  >
-                    Upgrading your vault...
-                  </Text>
-                  <Text
-                    style={[
-                      styles.unlockSubtitle,
-                      { color: colors.textSecondary, marginTop: spacing.xs },
-                    ]}
-                  >
-                    {migrationStepText || "Encrypting your saved passwords"}
-                  </Text>
-
-                  <View style={styles.progressContainer}>
+              <ScrollView
+                style={{ width: "100%" }}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+              >
+                {migrationSuccess ? (
+                  /* Success Screen */
+                  <View style={styles.migrationSuccessContainer}>
                     <View
                       style={[
-                        styles.progressBarBackground,
-                        { backgroundColor: colors.divider },
+                        styles.unlockIconCircle,
+                        { backgroundColor: "#10B9811A" },
                       ]}
                     >
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            width: `${migrationProgress}%`,
-                            backgroundColor: colors.primary,
-                          },
-                        ]}
-                      />
+                      <Feather name="check-circle" size={40} color="#10B981" />
                     </View>
                     <Text
                       style={[
-                        styles.progressPercent,
+                        styles.unlockTitle,
+                        { color: colors.textPrimary, marginTop: spacing.sm },
+                      ]}
+                    >
+                      Vault Security Upgraded
+                    </Text>
+                    <Text
+                      style={[
+                        styles.unlockSubtitle,
+                        {
+                          color: colors.textSecondary,
+                          marginVertical: spacing.md,
+                        },
+                      ]}
+                    >
+                      Your vault is now protected with client-side encryption.
+                      {"\n\n"}
+                      Your saved passwords are encrypted on your device before
+                      being stored.
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.primaryButton,
+                        { backgroundColor: colors.primary, marginTop: spacing.md },
+                      ]}
+                      onPress={() => {
+                        setShowMigrationModal(false);
+                        setMigrationSuccess(false);
+                      }}
+                    >
+                      <Text style={styles.submitButtonText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : isMigrating ? (
+                  /* Migration in Progress */
+                  <View style={styles.migrationProgressContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text
+                      style={[
+                        styles.unlockTitle,
+                        { color: colors.textPrimary, marginTop: spacing.lg },
+                      ]}
+                    >
+                      Upgrading your vault...
+                    </Text>
+                    <Text
+                      style={[
+                        styles.unlockSubtitle,
+                        { color: colors.textSecondary, marginTop: spacing.xs },
+                      ]}
+                    >
+                      {migrationStepText || "Encrypting your saved passwords"}
+                    </Text>
+
+                    <View style={styles.progressContainer}>
+                      <View
+                        style={[
+                          styles.progressBarBackground,
+                          { backgroundColor: colors.divider },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.progressBarFill,
+                            {
+                              backgroundColor: colors.primary,
+                              width: `${migrationProgress}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.progressPercent,
+                          { color: colors.primary },
+                        ]}
+                      >
+                        {migrationProgress}%
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.unlockSecurityNote,
+                        {
+                          color: colors.textSecondary,
+                          marginTop: spacing.md,
+                        },
+                      ]}
+                    >
+                      Please keep AuraTrack open.
+                    </Text>
+                  </View>
+                ) : (
+                  /* Migration Prompt Screen */
+                  <View style={styles.migrationPromptContainer}>
+                    <View
+                      style={[
+                        styles.unlockIconCircle,
+                        { backgroundColor: colors.primary + "1A" },
+                      ]}
+                    >
+                      <Feather name="shield" size={36} color={colors.primary} />
+                    </View>
+
+                    <Text
+                      style={[styles.unlockTitle, { color: colors.textPrimary }]}
+                    >
+                      Upgrade Your Vault Security
+                    </Text>
+                    <Text
+                      style={[
+                        styles.unlockSubtitle,
                         { color: colors.textSecondary },
                       ]}
                     >
-                      {migrationProgress}%
+                      AuraTrack can now protect your saved passwords using
+                      client-side encryption.{"\n\n"}
+                      Your existing passwords will be securely re-encrypted on
+                      this device.{"\n\n"}
+                      This may take a moment.
                     </Text>
-                  </View>
 
-                  <Text
-                    style={[
-                      styles.unlockSecurityNote,
-                      { color: colors.textSecondary, marginTop: spacing.md },
-                    ]}
-                  >
-                    Please keep AuraTrack open.
-                  </Text>
-                </View>
-              ) : (
-                /* Migration Prompt Screen */
-                <View style={styles.migrationPromptContainer}>
-                  <View
-                    style={[
-                      styles.unlockIconCircle,
-                      { backgroundColor: colors.primary + "1A" },
-                    ]}
-                  >
-                    <Feather name="shield" size={36} color={colors.primary} />
-                  </View>
+                    {migrationError && (
+                      <View style={styles.errorBanner}>
+                        <Feather
+                          name="alert-circle"
+                          size={16}
+                          color={colors.expense}
+                        />
+                        <Text
+                          style={[styles.errorText, { color: colors.expense }]}
+                        >
+                          {migrationError}
+                        </Text>
+                      </View>
+                    )}
 
-                  <Text
-                    style={[styles.unlockTitle, { color: colors.textPrimary }]}
-                  >
-                    Upgrade Your Vault Security
-                  </Text>
-                  <Text
-                    style={[
-                      styles.unlockSubtitle,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    AuraTrack can now protect your saved passwords using
-                    client-side encryption.{"\n\n"}
-                    Your existing passwords will be securely re-encrypted on
-                    this device.{"\n\n"}
-                    This may take a moment.
-                  </Text>
-
-                  {migrationError && (
-                    <View style={styles.errorBanner}>
-                      <Feather
-                        name="alert-circle"
-                        size={16}
-                        color={colors.expense}
-                      />
-                      <Text
-                        style={[styles.errorText, { color: colors.expense }]}
-                      >
-                        {migrationError}
-                      </Text>
-                    </View>
-                  )}
-
-                  <View
-                    style={[styles.passwordInputContainer, { width: "100%" }]}
-                  >
-                    <TextInput
-                      style={[
-                        styles.input,
-                        styles.passwordInput,
-                        {
-                          color: colors.textPrimary,
-                          borderColor: colors.divider,
-                        },
-                      ]}
-                      placeholder="Account password"
-                      placeholderTextColor={colors.textSecondary}
-                      value={migrationPassword}
-                      onChangeText={setMigrationPassword}
-                      secureTextEntry={!migrationPasswordVisible}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity
-                      onPress={() =>
-                        setMigrationPasswordVisible((prev) => !prev)
-                      }
-                      style={styles.formEyeButton}
+                    <View
+                      style={[styles.passwordInputContainer, { width: "100%" }]}
                     >
-                      <Feather
-                        name={migrationPasswordVisible ? "eye-off" : "eye"}
-                        size={18}
-                        color={colors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.migrationActions}>
-                    <TouchableOpacity
-                      style={[
-                        styles.formButton,
-                        styles.cancelButton,
-                        { borderColor: colors.divider },
-                      ]}
-                      onPress={handleDismissMigration}
-                    >
-                      <Text
+                      <TextInput
                         style={[
-                          styles.formButtonText,
-                          { color: colors.textSecondary },
+                          styles.input,
+                          styles.passwordInput,
+                          {
+                            color: colors.textPrimary,
+                            borderColor: colors.divider,
+                          },
                         ]}
+                        placeholder="Account password"
+                        placeholderTextColor={colors.textSecondary}
+                        value={migrationPassword}
+                        onChangeText={setMigrationPassword}
+                        secureTextEntry={!migrationPasswordVisible}
+                        autoCapitalize="none"
+                      />
+                      <TouchableOpacity
+                        onPress={() =>
+                          setMigrationPasswordVisible((prev) => !prev)
+                        }
+                        style={styles.formEyeButton}
                       >
-                        Later
-                      </Text>
-                    </TouchableOpacity>
+                        <Feather
+                          name={migrationPasswordVisible ? "eye-off" : "eye"}
+                          size={18}
+                          color={colors.textSecondary}
+                        />
+                      </TouchableOpacity>
+                    </View>
 
-                    <TouchableOpacity
-                      style={[
-                        styles.formButton,
-                        styles.submitButton,
-                        { backgroundColor: colors.primary },
-                      ]}
-                      onPress={handleStartMigration}
-                    >
-                      <Text style={styles.submitButtonText}>Upgrade Vault</Text>
-                    </TouchableOpacity>
+                    <View style={styles.migrationActions}>
+                      <TouchableOpacity
+                        style={[
+                          styles.migrationButton,
+                          styles.cancelButton,
+                          { borderColor: colors.divider, borderWidth: 1 },
+                        ]}
+                        onPress={handleDismissMigration}
+                      >
+                        <Text
+                          style={[
+                            styles.formButtonText,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          Later
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.migrationButton,
+                          { backgroundColor: colors.primary },
+                        ]}
+                        onPress={handleStartMigration}
+                      >
+                        <Text style={styles.submitButtonText}>Upgrade Vault</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              )}
+                )}
+              </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -833,97 +842,104 @@ export const PasswordManagerScreen: React.FC = () => {
               { backgroundColor: colors.secondaryBackground },
             ]}
           >
-            <View
-              style={[
-                styles.unlockIconCircle,
-                { backgroundColor: colors.primary + "1A" },
-              ]}
+            <ScrollView
+              style={{ width: "100%" }}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
             >
-              <Feather name="key" size={36} color={colors.primary} />
-            </View>
-
-            <Text style={[styles.unlockTitle, { color: colors.textPrimary }]}>
-              Save Your Recovery Key
-            </Text>
-
-            <Text
-              style={[
-                styles.unlockSubtitle,
-                { color: colors.textSecondary, marginBottom: spacing.md },
-              ]}
-            >
-              This is your emergency recovery key. If you forget your password,
-              this key is the ONLY way to regain access to your vault.
-              {"\n\n"}
-              It will{" "}
-              <Text style={{ fontWeight: "700", color: colors.textPrimary }}>
-                NEVER
-              </Text>{" "}
-              be shown again. Store it in a safe place.
-            </Text>
-
-            {/* Recovery key display box */}
-            <View
-              style={[
-                styles.recoveryKeyBox,
-                {
-                  backgroundColor: colors.background,
-                  borderColor: colors.divider,
-                },
-              ]}
-            >
-              <Text
-                selectable
-                style={[styles.recoveryKeyText, { color: colors.textPrimary }]}
+              <View
+                style={[
+                  styles.unlockIconCircle,
+                  { backgroundColor: colors.primary + "1A" },
+                ]}
               >
-                {pendingRecoveryKey}
-              </Text>
-            </View>
+                <Feather name="key" size={36} color={colors.primary} />
+              </View>
 
-            {/* Copy button */}
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                styles.copyButton,
-                {
-                  borderColor: copiedRecoveryKey ? "#10B981" : colors.primary,
-                  backgroundColor: copiedRecoveryKey
-                    ? "#10B98115"
-                    : colors.primary + "15",
-                  marginBottom: spacing.md,
-                },
-              ]}
-              onPress={handleCopyRecoveryKey}
-            >
-              <View style={styles.copyButtonContent}>
-                <Feather
-                  name={copiedRecoveryKey ? "check" : "copy"}
-                  size={16}
-                  color={copiedRecoveryKey ? "#10B981" : colors.primary}
-                />
+              <Text style={[styles.unlockTitle, { color: colors.textPrimary }]}>
+                Save Your Recovery Key
+              </Text>
+
+              <Text
+                style={[
+                  styles.unlockSubtitle,
+                  { color: colors.textSecondary, marginBottom: spacing.md },
+                ]}
+              >
+                This is your emergency recovery key. If you forget your password,
+                this key is the ONLY way to regain access to your vault.
+                {"\n\n"}
+                It will{" "}
+                <Text style={{ fontWeight: "700", color: colors.textPrimary }}>
+                  NEVER
+                </Text>{" "}
+                be shown again. Store it in a safe place.
+              </Text>
+
+              {/* Recovery key display box */}
+              <View
+                style={[
+                  styles.recoveryKeyBox,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.divider,
+                  },
+                ]}
+              >
                 <Text
-                  style={[
-                    styles.copyButtonText,
-                    { color: copiedRecoveryKey ? "#10B981" : colors.primary },
-                  ]}
+                  selectable
+                  style={[styles.recoveryKeyText, { color: colors.textPrimary }]}
                 >
-                  {copiedRecoveryKey
-                    ? "Copied to Clipboard!"
-                    : "Copy Recovery Key"}
+                  {pendingRecoveryKey}
                 </Text>
               </View>
-            </TouchableOpacity>
 
-            {/* I saved it button */}
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                { backgroundColor: colors.primary },
-              ]}
-              onPress={handleDismissRecoveryKeyModal}
-            >
-              <Text style={styles.submitButtonText}>I Saved It — Continue</Text>
-            </TouchableOpacity>
+              {/* Copy button */}
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  styles.copyButton,
+                  {
+                    borderColor: copiedRecoveryKey ? "#10B981" : colors.primary,
+                    backgroundColor: copiedRecoveryKey
+                      ? "#10B98115"
+                      : colors.primary + "15",
+                    marginBottom: spacing.md,
+                  },
+                ]}
+                onPress={handleCopyRecoveryKey}
+              >
+                <View style={styles.copyButtonContent}>
+                  <Feather
+                    name={copiedRecoveryKey ? "check" : "copy"}
+                    size={16}
+                    color={copiedRecoveryKey ? "#10B981" : colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.copyButtonText,
+                      { color: copiedRecoveryKey ? "#10B981" : colors.primary },
+                    ]}
+                  >
+                    {copiedRecoveryKey
+                      ? "Copied to Clipboard!"
+                      : "Copy Recovery Key"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* I saved it button */}
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  { backgroundColor: colors.primary },
+                ]}
+                onPress={handleDismissRecoveryKeyModal}
+              >
+                <Text style={styles.submitButtonText}>I Saved It — Continue</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -931,15 +947,20 @@ export const PasswordManagerScreen: React.FC = () => {
       {/* v2 vault lock screen */}
       {vaultVersion === "v2" && !isUnlocked ? (
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.unlockContainer}
         >
-          <View
-            style={[
-              styles.unlockCard,
-              { backgroundColor: colors.secondaryBackground },
-            ]}
+          <ScrollView
+            contentContainerStyle={styles.unlockScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
+            <View
+              style={[
+                styles.unlockCard,
+                { backgroundColor: colors.secondaryBackground },
+              ]}
+            >
             {isRecoveryMode ? (
               /* Recovery Key Unlock View */
               <>
@@ -1233,7 +1254,8 @@ export const PasswordManagerScreen: React.FC = () => {
               </>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
       ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1556,15 +1578,15 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     width: "100%",
-    borderRadius: 8,
-    paddingVertical: spacing.md,
+    height: 50,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   formButton: {
     flex: 1,
-    borderRadius: 8,
-    paddingVertical: spacing.md,
+    height: 50,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -1575,18 +1597,14 @@ const styles = StyleSheet.create({
   formButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    fontFamily: typography.family,
     textAlign: "center",
-    includeFontPadding: false,
   },
   submitButton: {},
   submitButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600",
-    fontFamily: typography.family,
+    fontWeight: "700",
     textAlign: "center",
-    includeFontPadding: false,
   },
   listContainer: {
     paddingBottom: spacing.sm,
@@ -1718,6 +1736,7 @@ const styles = StyleSheet.create({
   migrationModalCard: {
     width: "100%",
     maxWidth: 420,
+    maxHeight: "85%",
     borderRadius: 20,
     padding: spacing.xl,
     alignItems: "center",
@@ -1726,6 +1745,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 10,
+  },
+  modalScrollContent: {
+    width: "100%",
+    alignItems: "center",
+    paddingBottom: spacing.sm,
+  },
+  unlockScrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: spacing.xl,
   },
   migrationPromptContainer: {
     width: "100%",
@@ -1765,8 +1794,15 @@ const styles = StyleSheet.create({
   migrationActions: {
     flexDirection: "row",
     gap: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     width: "100%",
+  },
+  migrationButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   biometricButton: {
     width: "100%",
@@ -1783,7 +1819,6 @@ const styles = StyleSheet.create({
   biometricButtonText: {
     fontSize: 15,
     fontWeight: "600",
-    fontFamily: typography.family,
   },
   orDividerContainer: {
     flexDirection: "row",
@@ -1838,7 +1873,6 @@ const styles = StyleSheet.create({
   copyButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    fontFamily: typography.family,
   },
   recoveryKeyLink: {
     flexDirection: "row",

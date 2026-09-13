@@ -159,18 +159,23 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
   const refreshBiometricStatus = useCallback(async (userId?: string) => {
     try {
       const supported = await isBiometricSupported();
-      const sessionUser = userId ? { id: userId } : await getSessionUser();
-      const activeId = sessionUser?.id;
+      const sessionUser = await getSessionUser();
+      const activeId = userId || sessionUser?.id;
+      const appLockEnabled = sessionUser?.app_lock_enabled === true;
 
-      if (!activeId) {
-        setIsBiometricAvailable(false);
+      setIsBiometricAvailable(supported);
+
+      if (!activeId || !appLockEnabled || !supported) {
         setHasBiometricSetup(false);
+        if (activeId && !appLockEnabled) {
+          // If app lock is disabled, clear any residual biometric DEK from SecureStore
+          await removeBiometricDEK(activeId);
+        }
         return;
       }
 
-      setIsBiometricAvailable(supported);
       const hasKey = await hasStoredBiometricDEK(activeId);
-      setHasBiometricSetup(hasKey && supported);
+      setHasBiometricSetup(hasKey);
     } catch {
       setIsBiometricAvailable(false);
       setHasBiometricSetup(false);

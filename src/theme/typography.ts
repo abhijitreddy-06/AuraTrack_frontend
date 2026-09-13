@@ -3,8 +3,8 @@ import { Platform } from "react-native";
 export const typography = {
   family: Platform.select({
     ios: "System",
-    android: "sans-serif",
-    default: "sans-serif",
+    android: undefined,
+    default: undefined,
   }),
   weight: {
     regular: "400",

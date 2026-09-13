@@ -211,7 +211,6 @@ export const PasswordManagerScreen: React.FC = () => {
     }
   };
 
-  // Optional convenience: auto-prompt biometrics once on mount if biometric setup exists
   // Reset auto-prompt ref whenever vault is unlocked so future locks can prompt again
   useEffect(() => {
     if (isUnlocked) {

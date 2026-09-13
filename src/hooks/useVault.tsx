@@ -195,11 +195,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
         setVaultVersion(effectiveVersion);
         setMigrationStatus(meta.migration_status ?? "not_started");
 
-        // v1 users don't need client-side key derivation — mark them unlocked.
-        if (effectiveVersion === "v1") {
-          setIsUnlocked(true);
-        }
-
         await refreshBiometricStatus(sessionUser?.id);
         return meta;
       } catch (err) {

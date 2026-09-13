@@ -1,9 +1,15 @@
+import { Platform } from "react-native";
+
 export const typography = {
-  family: 'System', // You can later replace with custom fonts
+  family: Platform.select({
+    ios: "System",
+    android: "sans-serif",
+    default: "sans-serif",
+  }),
   weight: {
-    regular: '400',
-    medium: '500',
-    semibold: '600',
-    bold: '700',
+    regular: "400",
+    medium: "500",
+    semibold: "600",
+    bold: "700",
   },
 };

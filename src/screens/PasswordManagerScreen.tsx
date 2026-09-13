@@ -402,9 +402,12 @@ export const PasswordManagerScreen: React.FC = () => {
       setFormPasswordVisible(false);
       setEditingId(item.id);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : "Please try again.";
       Alert.alert(
         "Could not load password details",
-        error instanceof Error ? error.message : "Please try again.",
+        msg.includes("wrong DEK")
+          ? "Decryption failed for this entry. It was encrypted with an earlier key from an interrupted migration. You can delete or re-create this credential."
+          : msg,
       );
     }
   };
@@ -487,9 +490,12 @@ export const PasswordManagerScreen: React.FC = () => {
       }));
       setShowPassword((prev) => ({ ...prev, [id]: true }));
     } catch (error) {
+      const msg = error instanceof Error ? error.message : "Please try again.";
       Alert.alert(
         "Could not reveal password",
-        error instanceof Error ? error.message : "Please try again.",
+        msg.includes("wrong DEK")
+          ? "Decryption failed for this entry. It was encrypted with an earlier key from an interrupted migration. You can delete or re-create this credential."
+          : msg,
       );
     } finally {
       setLoadingSecrets((prev) => ({ ...prev, [id]: false }));
@@ -877,7 +883,7 @@ export const PasswordManagerScreen: React.FC = () => {
             {/* Copy button */}
             <TouchableOpacity
               style={[
-                styles.formButton,
+                styles.primaryButton,
                 styles.copyButton,
                 {
                   borderColor: copiedRecoveryKey ? "#10B981" : colors.primary,
@@ -911,9 +917,8 @@ export const PasswordManagerScreen: React.FC = () => {
             {/* I saved it button */}
             <TouchableOpacity
               style={[
-                styles.formButton,
-                styles.submitButton,
-                { backgroundColor: colors.primary, width: "100%" },
+                styles.primaryButton,
+                { backgroundColor: colors.primary },
               ]}
               onPress={handleDismissRecoveryKeyModal}
             >
@@ -1002,12 +1007,10 @@ export const PasswordManagerScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={[
-                    styles.formButton,
-                    styles.submitButton,
+                    styles.primaryButton,
                     {
                       backgroundColor: colors.primary,
                       opacity: isRecovering || isVaultLoading ? 0.7 : 1,
-                      width: "100%",
                       marginBottom: spacing.md,
                     },
                   ]}
@@ -1086,11 +1089,12 @@ export const PasswordManagerScreen: React.FC = () => {
                 {hasBiometricSetup && isBiometricAvailable && (
                   <TouchableOpacity
                     style={[
-                      styles.formButton,
+                      styles.primaryButton,
                       styles.biometricButton,
                       {
                         backgroundColor: colors.primary + "15",
                         borderColor: colors.primary,
+                        borderWidth: 1,
                       },
                     ]}
                     onPress={handleBiometricUnlock}
@@ -1182,8 +1186,7 @@ export const PasswordManagerScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={[
-                    styles.formButton,
-                    styles.submitButton,
+                    styles.primaryButton,
                     {
                       backgroundColor: colors.primary,
                       opacity: isDerivingKey || isVaultLoading ? 0.7 : 1,
@@ -1545,11 +1548,25 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
+  modalActions: {
+    flexDirection: "row",
+    gap: spacing.md,
+    marginTop: spacing.md,
+    width: "100%",
+  },
+  primaryButton: {
+    width: "100%",
+    borderRadius: 8,
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   formButton: {
     flex: 1,
     borderRadius: 8,
     paddingVertical: spacing.md,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
   },
   cancelButton: {
@@ -1559,6 +1576,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     fontFamily: typography.family,
+    textAlign: "center",
+    includeFontPadding: false,
   },
   submitButton: {},
   submitButtonText: {
@@ -1566,6 +1585,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     fontFamily: typography.family,
+    textAlign: "center",
+    includeFontPadding: false,
   },
   listContainer: {
     paddingBottom: spacing.sm,

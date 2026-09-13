@@ -132,14 +132,14 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [appLock.isLocked, vaultVersion, lockVault]);
 
-  // 2. AppState change: when app is backgrounded or inactive while App Lock is enabled,
-  // wipe in-memory keys immediately. The SecureStore copy remains for biometric re-unlock.
+  // 2. AppState change: when app is backgrounded or inactive,
+  // wipe in-memory keys immediately for any v2 vault.
+  // The SecureStore copy remains for biometric re-unlock if enabled.
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (
         (nextState === "inactive" || nextState === "background") &&
-        vaultVersion === "v2" &&
-        appLock.isEnabled
+        vaultVersion === "v2"
       ) {
         lockVault();
       }
@@ -152,7 +152,7 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
     return () => {
       subscription.remove();
     };
-  }, [appLock.isEnabled, vaultVersion, lockVault]);
+  }, [vaultVersion, lockVault]);
 
   // ─── Check Biometric Status ────────────────────────────────────────────────
 
@@ -362,6 +362,22 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
           recoveryKek = null;
 
           await initializeVault({
+            kdf_salt: kdfSalt,
+            kdf_params: kdfParams,
+            wrapped_dek: wrappedDek,
+            wrapped_dek_nonce: nonce,
+            recovery_kdf_salt: recSalt,
+            recovery_kdf_params: recParams,
+            recovery_wrapped_dek: recWrapped.wrappedDek,
+            recovery_wrapped_dek_nonce: recWrapped.nonce,
+          });
+
+          await setSessionUserVaultVersion("v2");
+          setVaultVersion("v2");
+          setMigrationStatus("completed");
+          setMetadata({
+            vault_version: "v2",
+            migration_status: "completed",
             kdf_salt: kdfSalt,
             kdf_params: kdfParams,
             wrapped_dek: wrappedDek,

@@ -43,6 +43,7 @@ export const PasswordManagerScreen: React.FC = () => {
     isUnlocked,
     dek,
     isLoading: isVaultLoading,
+    metadata,
     error: vaultError,
     isBiometricAvailable,
     hasBiometricSetup,
@@ -103,14 +104,16 @@ export const PasswordManagerScreen: React.FC = () => {
   }, [loadMetadata]);
 
   useEffect(() => {
-    if (isUnlocked || vaultVersion === "v1") {
+    if (isUnlocked || (vaultVersion === "v1" && hasDismissedMigration)) {
       void loadEntries();
     }
-  }, [isUnlocked, vaultVersion]);
+  }, [isUnlocked, vaultVersion, hasDismissedMigration]);
 
-  // Prompt eligible v1 users once on screen load
+  // Prompt eligible v1 users only after metadata has loaded
   useEffect(() => {
     if (
+      metadata !== null &&
+      !isVaultLoading &&
       vaultVersion === "v1" &&
       migrationStatus !== "completed" &&
       !hasDismissedMigration &&
@@ -119,6 +122,8 @@ export const PasswordManagerScreen: React.FC = () => {
       setShowMigrationModal(true);
     }
   }, [
+    metadata,
+    isVaultLoading,
     vaultVersion,
     migrationStatus,
     hasDismissedMigration,
@@ -207,6 +212,14 @@ export const PasswordManagerScreen: React.FC = () => {
   };
 
   // Optional convenience: auto-prompt biometrics once on mount if biometric setup exists
+  // Reset auto-prompt ref whenever vault is unlocked so future locks can prompt again
+  useEffect(() => {
+    if (isUnlocked) {
+      hasAutoPromptedBiometrics.current = false;
+    }
+  }, [isUnlocked]);
+
+  // Optional convenience: auto-prompt biometrics once on mount or when locked if biometric setup exists
   useEffect(() => {
     if (
       vaultVersion === "v2" &&

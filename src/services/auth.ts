@@ -1,6 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 import { clearUserOfflineData } from "../offline/database";
 import { getNetworkState } from "../offline/network";
+import {
+  unregisterPushTokenForLogout,
+  syncPushTokenAfterLogin,
+} from "./notifications";
 
 const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 const defaultBaseUrl = "https://auratrack-9z5t.onrender.com";
@@ -109,6 +113,7 @@ const saveTokens = async (result: AuthResponse) => {
 export const login = async (email: string, password: string) => {
   const result = await request("/api/auth/login", { email, password });
   await saveTokens(result);
+  void syncPushTokenAfterLogin();
 };
 
 export const signup = async (
@@ -122,6 +127,7 @@ export const signup = async (
     password,
   });
   await saveTokens(result);
+  void syncPushTokenAfterLogin();
 };
 
 export const restoreSession = async () => {
@@ -164,11 +170,18 @@ export const clearSession = async () => {
     SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
     SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     SecureStore.deleteItemAsync(SESSION_USER_KEY),
+    SecureStore.deleteItemAsync("auratrack.expoPushToken"),
   ]);
 };
 
 export const logout = async () => {
   const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+
+  try {
+    await unregisterPushTokenForLogout();
+  } catch {
+    // Non-blocking: unregistering push token should not prevent session cleanup
+  }
 
   try {
     if (refreshToken) {

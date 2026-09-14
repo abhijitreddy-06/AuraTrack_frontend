@@ -5,9 +5,9 @@ import { authenticatedRequest } from "./auth";
 export type PasswordEntry = {
   id: string;
   title: string;
-  /** For v1: plaintext. For v2: ciphertext string from the server. */
+  /** Ciphertext string from the server: "<nonce_b64url>.<ciphertext_b64url>" */
   key: string;
-  /** For v1: plaintext. For v2: ciphertext string from the server. */
+  /** Ciphertext string from the server: "<nonce_b64url>.<ciphertext_b64url>" */
   value: string;
   created_at: string;
 };
@@ -21,7 +21,7 @@ export type PasswordEntrySummary = {
 type SecretResponse = { success: boolean; data: PasswordEntry };
 type SummaryResponse = { success: boolean; data: PasswordEntrySummary };
 
-// ─── v1 API calls (plaintext fields — backend encrypts/decrypts) ──────────────
+// ─── Password entries API calls ───────────────────────────────────────────────
 
 export const getPasswords = () =>
   authenticatedRequest<{ success: boolean; data: PasswordEntrySummary[] }>(
@@ -30,23 +30,6 @@ export const getPasswords = () =>
 
 export const getPasswordSecret = (id: string) =>
   authenticatedRequest<SecretResponse>(`/api/passwords/${id}/secret`);
-
-export const createPassword = (
-  body: Pick<PasswordEntry, "title" | "key" | "value">,
-) =>
-  authenticatedRequest<SummaryResponse>("/api/passwords", {
-    method: "POST",
-    body,
-  });
-
-export const updatePassword = (
-  id: string,
-  body: Pick<PasswordEntry, "title" | "key" | "value">,
-) =>
-  authenticatedRequest<SummaryResponse>(`/api/passwords/${id}`, {
-    method: "PATCH",
-    body,
-  });
 
 export const deletePassword = (id: string) =>
   authenticatedRequest<{ success: boolean }>(`/api/passwords/${id}`, {
@@ -71,7 +54,7 @@ export type V2PasswordBody = {
 export type V2PasswordPatchBody = Partial<V2PasswordBody> & { title?: string };
 
 /**
- * POST /api/passwords — v2 variant.
+ * POST /api/passwords
  * Sends pre-encrypted key_/value_ ciphertext; backend stores blindly.
  */
 export const createPasswordV2 = (body: V2PasswordBody) =>
@@ -81,7 +64,7 @@ export const createPasswordV2 = (body: V2PasswordBody) =>
   });
 
 /**
- * PATCH /api/passwords/:id — v2 variant.
+ * PATCH /api/passwords/:id
  * Sends pre-encrypted key_/value_ ciphertext for changed fields only.
  */
 export const updatePasswordV2 = (id: string, body: V2PasswordPatchBody) =>
@@ -93,8 +76,7 @@ export const updatePasswordV2 = (id: string, body: V2PasswordPatchBody) =>
 // ─── Vault metadata types ─────────────────────────────────────────────────────
 
 export type UserVaultMetadata = {
-  vault_version: "v1" | "v2";
-  migration_status?: "not_started" | "in_progress" | "completed";
+  vault_version: "v2";
   kdf_salt: string | null;
   kdf_params: {
     opslimit: number;
@@ -157,7 +139,7 @@ export const setVaultRecoveryMetadata = (body: VaultRecoveryPayload) =>
 
 export type VaultInitResult = {
   alreadyInitialized: boolean;
-  vault_version: "v1" | "v2";
+  vault_version: "v2";
 };
 
 /**
@@ -168,87 +150,4 @@ export const initializeVault = (body: VaultInitPayload) =>
   authenticatedRequest<{ success: boolean; data: VaultInitResult }>(
     "/api/passwords/vault/init",
     { method: "POST", body },
-  );
-
-// ─── Phase 6: Migration API calls ─────────────────────────────────────────────
-
-export type MigrationStartResult = {
-  alreadyStarted: boolean;
-  kdf_salt: string;
-  kdf_params: {
-    opslimit: number;
-    memlimit: number;
-    algo: number;
-  };
-  wrapped_dek: string;
-  wrapped_dek_nonce: string;
-  recovery_kdf_salt?: string;
-  recovery_kdf_params?: {
-    opslimit: number;
-    memlimit: number;
-    algo: number;
-  };
-  recovery_wrapped_dek?: string;
-  recovery_wrapped_dek_nonce?: string;
-};
-
-export type MigrationV1ExportEntry = {
-  id: string;
-  title: string;
-  key: string | null;
-  value: string | null;
-  already_migrated: boolean;
-  created_at: string;
-};
-
-export type MigrationUploadEntry = {
-  id: string;
-  key_: string;
-  value_: string;
-};
-
-export type MigrationCompleteResult = {
-  vault_version: "v2";
-  migrated_count: number;
-  already_completed: boolean;
-};
-
-/**
- * Initiates vault migration: stores the wrapped DEK for a v1 user without flipping vault_version.
- */
-export const startVaultMigration = (body: VaultInitPayload) =>
-  authenticatedRequest<{ success: boolean; data: MigrationStartResult }>(
-    "/api/passwords/migration/start",
-    { method: "POST", body },
-  );
-
-/**
- * Fetches existing v1 plaintext entries for immediate client-side re-encryption.
- * Gated strictly on backend: requires vault_version = 'v1' and migration_status = 'in_progress'.
- */
-export const exportV1EntriesForMigration = () =>
-  authenticatedRequest<{ success: boolean; data: MigrationV1ExportEntry[] }>(
-    "/api/passwords/migration/v1-export",
-    { method: "POST" },
-  );
-
-/**
- * Uploads client-side re-encrypted v2 ciphertexts for migrated entries.
- */
-export const uploadMigratedEntries = (entries: MigrationUploadEntry[]) =>
-  authenticatedRequest<{
-    success: boolean;
-    data: { id: string; success: boolean }[];
-  }>("/api/passwords/migration/upload-entries", {
-    method: "POST",
-    body: { entries },
-  });
-
-/**
- * Verifies all entries are migrated and flips vault_version to 'v2'.
- */
-export const completeVaultMigration = () =>
-  authenticatedRequest<{ success: boolean; data: MigrationCompleteResult }>(
-    "/api/passwords/migration/complete",
-    { method: "POST" },
   );

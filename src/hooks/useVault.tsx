@@ -16,8 +16,6 @@ import {
   unwrapDEK,
   wipeBytes,
   wrapDEK,
-  encryptField,
-  decryptField,
   VaultCryptoError,
   generateRecoveryKey,
   normalizeRecoveryKey,
@@ -26,11 +24,6 @@ import {
   getUserVaultMetadata,
   initializeVault,
   setVaultRecoveryMetadata,
-  startVaultMigration,
-  exportV1EntriesForMigration,
-  uploadMigratedEntries,
-  completeVaultMigration,
-  MigrationUploadEntry,
   UserVaultMetadata,
 } from "../services/passwords";
 import {
@@ -50,8 +43,7 @@ import {
 } from "../services/crypto/vaultBiometrics";
 
 interface VaultContextValue {
-  vaultVersion: "v1" | "v2";
-  migrationStatus: "not_started" | "in_progress" | "completed";
+  vaultVersion: "v2";
   isUnlocked: boolean;
   isLoading: boolean;
   metadata: UserVaultMetadata | null;
@@ -64,7 +56,7 @@ interface VaultContextValue {
   isBiometricAvailable: boolean;
   /** Whether a valid biometric DEK is stored in SecureStore for the active user. */
   hasBiometricSetup: boolean;
-  /** One-time recovery key generated during v2 init or migration. */
+  /** One-time recovery key generated during v2 init. */
   pendingRecoveryKey: string | null;
   loadMetadata: () => Promise<UserVaultMetadata | null>;
   unlockVaultWithPassword: (password: string) => Promise<boolean>;
@@ -73,10 +65,6 @@ interface VaultContextValue {
   clearPendingRecoveryKey: () => void;
   enableBiometricUnlock: () => Promise<boolean>;
   disableBiometricUnlock: () => Promise<boolean>;
-  migrateVault: (
-    password: string,
-    onProgress?: (percent: number, stepText: string) => void,
-  ) => Promise<boolean>;
   lockVault: () => void;
   clearError: () => void;
 }
@@ -87,10 +75,7 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const appLock = useAppLock();
-  const [vaultVersion, setVaultVersion] = useState<"v1" | "v2">("v1");
-  const [migrationStatus, setMigrationStatus] = useState<
-    "not_started" | "in_progress" | "completed"
-  >("not_started");
+  const vaultVersion = "v2" as const;
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [metadata, setMetadata] = useState<UserVaultMetadata | null>(null);
@@ -190,15 +175,9 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
       setError(null);
       try {
         const sessionUser = await getSessionUser();
-        const sessionVersion = sessionUser?.vault_version ?? "v1";
-
         const res = await getUserVaultMetadata();
         const meta = res.data;
         setMetadata(meta);
-
-        const effectiveVersion = meta.vault_version ?? sessionVersion;
-        setVaultVersion(effectiveVersion);
-        setMigrationStatus(meta.migration_status ?? "not_started");
 
         await refreshBiometricStatus(sessionUser?.id);
         return meta;
@@ -253,23 +232,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
             "INIT_FAILED",
           );
         }
-
-        // ── v1 fast path (existing v1 users who have not migrated) ────────
-        // A brand-new user starts with vault_version='v1' and kdf_salt=null.
-        // That user must be initialized as v2 immediately — NOT treated as
-        // a legacy v1 user. Distinguish by presence of kdf_salt:
-        //   kdf_salt IS NULL   → never set up → do v2 init below
-        //   kdf_salt NOT NULL  → genuine v1 with server-side encryption → fast path
-        if (
-          currentMeta.vault_version === "v1" &&
-          currentMeta.kdf_salt !== null
-        ) {
-          setIsUnlocked(true);
-          return true;
-        }
-
-        // New user (vault_version='v1', kdf_salt=null) falls through to v2 init.
-        // After initializeVault() the backend flips their vault_version to 'v2'.
 
         // ── v2: ensure we have KDF metadata ────────────────────────────────
         // Existing v2 users: kdf_salt/params come from the backend.
@@ -373,11 +335,8 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
           });
 
           await setSessionUserVaultVersion("v2");
-          setVaultVersion("v2");
-          setMigrationStatus("completed");
           setMetadata({
             vault_version: "v2",
-            migration_status: "completed",
             kdf_salt: kdfSalt,
             kdf_params: kdfParams,
             wrapped_dek: wrappedDek,
@@ -460,11 +419,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
             "Could not fetch vault metadata from server",
             "INIT_FAILED",
           );
-        }
-
-        if (currentMeta.vault_version === "v1") {
-          setIsUnlocked(true);
-          return true;
         }
 
         if (
@@ -551,12 +505,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
       let currentMeta = metadata;
       if (!currentMeta) {
         currentMeta = await loadMetadata();
-      }
-
-      // v1 compatibility: bypass client-side DEK
-      if (currentMeta?.vault_version === "v1") {
-        setIsUnlocked(true);
-        return true;
       }
 
       const supported = await isBiometricSupported();
@@ -656,211 +604,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
-  // ─── Phase 6: Vault Migration Flow ─────────────────────────────────────────
-
-  const migrateVault = useCallback(
-    async (
-      password: string,
-      onProgress?: (percent: number, stepText: string) => void,
-    ): Promise<boolean> => {
-      if (!password) {
-        setError("Password cannot be empty");
-        return false;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      let activeKek: Uint8Array | null = null;
-      let activeDek: Uint8Array | null = null;
-
-      try {
-        onProgress?.(10, "Deriving encryption keys...");
-
-        const res = await getUserVaultMetadata();
-        const currentMeta = res.data;
-        setMetadata(currentMeta);
-
-        if (currentMeta.vault_version === "v2") {
-          throw new Error("Vault is already upgraded to v2.");
-        }
-
-        let salt = currentMeta.kdf_salt;
-        let params = currentMeta.kdf_params;
-        let wrappedDek = currentMeta.wrapped_dek;
-        let wrappedDekNonce = currentMeta.wrapped_dek_nonce;
-
-        if (!salt || !params) {
-          salt = await generateSalt();
-          params = await getDefaultKdfParams();
-        }
-
-        activeKek = await deriveKEK(password, salt, params);
-
-        let generatedRecoveryKey: string | null = null;
-        let recSalt = currentMeta.recovery_kdf_salt;
-        let recParams = currentMeta.recovery_kdf_params;
-        let recWrappedDek = currentMeta.recovery_wrapped_dek;
-        let recWrappedDekNonce = currentMeta.recovery_wrapped_dek_nonce;
-
-        if (wrappedDek && wrappedDekNonce) {
-          try {
-            activeDek = await unwrapDEK(wrappedDek, wrappedDekNonce, activeKek);
-          } catch {
-            throw new VaultCryptoError(
-              "Failed to unwrap existing migration key. Please check your password.",
-              "UNWRAP_FAILED",
-            );
-          }
-        } else {
-          activeDek = await generateDEK();
-          const wrapped = await wrapDEK(activeDek, activeKek);
-          wrappedDek = wrapped.wrappedDek;
-          wrappedDekNonce = wrapped.nonce;
-        }
-
-        onProgress?.(25, "Securing emergency recovery key...");
-
-        if (!recWrappedDek || !recSalt || !recParams) {
-          const { formattedKey, normalizedKey } = await generateRecoveryKey();
-          generatedRecoveryKey = formattedKey;
-          recSalt = await generateSalt();
-          recParams = await getDefaultKdfParams();
-          const recKek = await deriveKEK(normalizedKey, recSalt, recParams);
-          const recWrapped = await wrapDEK(activeDek, recKek);
-          wipeBytes(recKek);
-          recWrappedDek = recWrapped.wrappedDek;
-          recWrappedDekNonce = recWrapped.nonce;
-        }
-
-        onProgress?.(35, "Registering vault migration session...");
-
-        // Always call startVaultMigration to ensure backend sets migration_status = 'in_progress'
-        const startRes = await startVaultMigration({
-          kdf_salt: salt,
-          kdf_params: params,
-          wrapped_dek: wrappedDek,
-          wrapped_dek_nonce: wrappedDekNonce,
-          recovery_kdf_salt: recSalt,
-          recovery_kdf_params: recParams,
-          recovery_wrapped_dek: recWrappedDek,
-          recovery_wrapped_dek_nonce: recWrappedDekNonce,
-        });
-
-        if (startRes.data.alreadyStarted) {
-          // Re-derive if server had an authoritative earlier salt/dek
-          if (startRes.data.kdf_salt !== salt) {
-            wipeBytes(activeKek);
-            activeKek = await deriveKEK(
-              password,
-              startRes.data.kdf_salt,
-              startRes.data.kdf_params,
-            );
-          }
-          if (startRes.data.wrapped_dek !== wrappedDek) {
-            wipeBytes(activeDek);
-            activeDek = await unwrapDEK(
-              startRes.data.wrapped_dek,
-              startRes.data.wrapped_dek_nonce,
-              activeKek,
-            );
-          }
-        }
-
-        onProgress?.(45, "Retrieving saved passwords for encryption...");
-
-        const exportRes = await exportV1EntriesForMigration();
-        const entries = exportRes.data;
-        const unmigrated = entries.filter((e) => !e.already_migrated);
-
-        onProgress?.(
-          50,
-          `Encrypting ${unmigrated.length} passwords on your device...`,
-        );
-
-        const entriesToUpload: MigrationUploadEntry[] = [];
-        for (let i = 0; i < unmigrated.length; i++) {
-          const item = unmigrated[i];
-          if (item.key === null || item.value === null) {
-            continue;
-          }
-
-          const encKey = await encryptField(item.key, activeDek);
-          const encVal = await encryptField(item.value, activeDek);
-
-          const decKey = await decryptField(encKey, activeDek);
-          const decVal = await decryptField(encVal, activeDek);
-          if (decKey !== item.key || decVal !== item.value) {
-            throw new VaultCryptoError(
-              "Local verification failed for re-encrypted password",
-              "DECRYPT_FAILED",
-            );
-          }
-
-          entriesToUpload.push({
-            id: item.id,
-            key_: encKey,
-            value_: encVal,
-          });
-
-          const pct =
-            50 + Math.round(((i + 1) / Math.max(unmigrated.length, 1)) * 30);
-          onProgress?.(
-            pct,
-            `Encrypting passwords (${i + 1}/${unmigrated.length})...`,
-          );
-        }
-
-        onProgress?.(85, "Saving encrypted passwords...");
-
-        if (entriesToUpload.length > 0) {
-          await uploadMigratedEntries(entriesToUpload);
-        }
-
-        onProgress?.(95, "Finalizing vault security upgrade...");
-
-        await completeVaultMigration();
-
-        if (generatedRecoveryKey) {
-          setPendingRecoveryKey(generatedRecoveryKey);
-        }
-
-        await setSessionUserVaultVersion("v2");
-        setVaultVersion("v2");
-        setMigrationStatus("completed");
-        setIsUnlocked(true);
-
-        wipeBytes(kekRef.current);
-        kekRef.current = activeKek;
-        activeKek = null;
-
-        wipeBytes(dekRef.current);
-        dekRef.current = activeDek;
-        activeDek = null;
-
-        // Phase 7: Save DEK to SecureStore if app lock is enabled
-        const sessionUser = await getSessionUser();
-        if (sessionUser?.id && sessionUser.app_lock_enabled && dekRef.current) {
-          await saveBiometricDEK(sessionUser.id, dekRef.current);
-          setHasBiometricSetup(true);
-        }
-
-        await loadMetadata();
-        onProgress?.(100, "Vault upgraded successfully!");
-        return true;
-      } catch (err) {
-        wipeBytes(activeKek);
-        wipeBytes(activeDek);
-        const msg = err instanceof Error ? err.message : "Migration failed";
-        setError(msg);
-        throw err;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [loadMetadata],
-  );
-
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   const clearError = useCallback(() => {
@@ -880,7 +623,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
     <VaultContext.Provider
       value={{
         vaultVersion,
-        migrationStatus,
         isUnlocked,
         isLoading,
         metadata,
@@ -897,7 +639,6 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
         clearPendingRecoveryKey,
         enableBiometricUnlock,
         disableBiometricUnlock,
-        migrateVault,
         lockVault,
         clearError,
       }}

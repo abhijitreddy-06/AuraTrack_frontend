@@ -98,10 +98,52 @@ export const disablePushNotifications = async () => {
     await authenticatedRequest("/api/notifications/push-token", {
       method: "DELETE",
       body: { token },
-    });
+    }).catch(() => {});
 
-    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => {});
     // Also unregister natively when disabling
-    await Notifications.unregisterForNotificationsAsync();
+    await Notifications.unregisterForNotificationsAsync().catch(() => {});
   }
 };
+
+/**
+ * Called during logout to ensure backend stops dispatching notifications to this device,
+ * and purges the local push token from SecureStore.
+ */
+export const unregisterPushTokenForLogout = async () => {
+  try {
+    const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+    if (token) {
+      await authenticatedRequest("/api/notifications/push-token", {
+        method: "DELETE",
+        body: { token },
+      }).catch((err) => {
+        console.warn("Failed to delete push token from backend during logout:", err);
+      });
+
+      await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => {});
+      await Notifications.unregisterForNotificationsAsync().catch(() => {});
+    }
+  } catch (error) {
+    console.warn("Error unregistering push token during logout:", error);
+  }
+};
+
+/**
+ * Called after successful login/signup to ensure the current device's Expo push token
+ * is associated with the newly logged-in user ID without requiring manual re-toggle.
+ */
+export const syncPushTokenAfterLogin = async (): Promise<boolean> => {
+  try {
+    if (!Device.isDevice) return false;
+    const permissions = await Notifications.getPermissionsAsync();
+    if (permissions.status === "granted") {
+      return await registerForPushNotifications();
+    }
+    return false;
+  } catch (error) {
+    console.warn("Failed to sync push token after login:", error);
+    return false;
+  }
+};
+

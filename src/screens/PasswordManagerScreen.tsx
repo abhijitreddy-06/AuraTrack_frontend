@@ -112,10 +112,10 @@ export const PasswordManagerScreen: React.FC = () => {
   useEffect(() => {
     if (isProcessing) {
       const startTime = Date.now();
-      setCountdownSeconds(60);
+      setCountdownSeconds(300);
       processingTimerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        setCountdownSeconds(Math.max(0, 60 - elapsed));
+        setCountdownSeconds(Math.max(0, 300 - elapsed));
       }, 200);
     } else if (processingTimerRef.current) {
       clearInterval(processingTimerRef.current);

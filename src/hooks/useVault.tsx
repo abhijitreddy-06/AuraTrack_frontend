@@ -222,7 +222,7 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
 
       try {
         let currentMeta = metadata;
-        if (!currentMeta) {
+        if (!currentMeta || !currentMeta.wrapped_dek) {
           currentMeta = await loadMetadata();
         }
 
@@ -323,7 +323,7 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
           wipeBytes(recoveryKek);
           recoveryKek = null;
 
-          await initializeVault({
+          const initRes = await initializeVault({
             kdf_salt: kdfSalt,
             kdf_params: kdfParams,
             wrapped_dek: wrappedDek,
@@ -333,6 +333,38 @@ export const VaultProvider: React.FC<{ children: ReactNode }> = ({
             recovery_wrapped_dek: recWrapped.wrappedDek,
             recovery_wrapped_dek_nonce: recWrapped.nonce,
           });
+
+          // CRITICAL SECURITY GATE:
+          // If server reports alreadyInitialized = true, the vault already existed!
+          // We must NOT unlock with freshDek. Attempt to unwrap server's real DEK instead.
+          if (initRes.data?.alreadyInitialized) {
+            const serverMeta = await loadMetadata();
+            if (serverMeta?.wrapped_dek && serverMeta?.wrapped_dek_nonce) {
+              const serverKek = await deriveKEK(
+                password,
+                serverMeta.kdf_salt || kdfSalt,
+                serverMeta.kdf_params || kdfParams,
+              );
+              let canonicalUnwrapped: Uint8Array;
+              try {
+                canonicalUnwrapped = await unwrapDEK(
+                  serverMeta.wrapped_dek,
+                  serverMeta.wrapped_dek_nonce,
+                  serverKek,
+                );
+              } finally {
+                wipeBytes(serverKek);
+              }
+              wipeBytes(dekRef.current);
+              dekRef.current = canonicalUnwrapped;
+              setIsUnlocked(true);
+              return true;
+            }
+            throw new VaultCryptoError(
+              "Failed to unwrap DEK. Password may be incorrect.",
+              "UNWRAP_FAILED",
+            );
+          }
 
           await setSessionUserVaultVersion("v2");
           setMetadata({

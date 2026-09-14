@@ -36,43 +36,13 @@ import {
   updatePasswordV2,
 } from "../services/passwords";
 
-const formatElapsed = (totalSeconds: number) => {
-  const minutes = Math.floor(totalSeconds / 60)
+const formatCountdown = (totalSeconds: number) => {
+  const clamped = Math.max(0, totalSeconds);
+  const minutes = Math.floor(clamped / 60)
     .toString()
     .padStart(2, "0");
-  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  const seconds = (clamped % 60).toString().padStart(2, "0");
   return `${minutes}:${seconds}`;
-};
-
-// Smooth animated progress bar shown during password / recovery unlocks.
-// Caps at 90% so it never looks "done" until the operation actually finishes.
-const UnlockProgressBar: React.FC<{ color: string; track: string }> = ({
-  color,
-  track,
-}) => {
-  const progress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(progress, {
-      toValue: 0.9,
-      duration: 35000,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: false,
-    }).start();
-  }, [progress]);
-
-  const width = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["4%", "100%"],
-  });
-
-  return (
-    <View style={[styles.unlockProgressTrack, { backgroundColor: track }]}>
-      <Animated.View
-        style={[styles.unlockProgressFill, { backgroundColor: color, width }]}
-      />
-    </View>
-  );
 };
 
 export const PasswordManagerScreen: React.FC = () => {
@@ -133,20 +103,17 @@ export const PasswordManagerScreen: React.FC = () => {
 
   // Full-screen loading overlay is for slow KDF paths (password / recovery unlock)
   const isProcessing = isDerivingKey || isRecovering;
-  const processingMessage = isRecovering
-    ? "Opening with your backup key"
-    : "Unlocking your passwords";
 
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [countdownSeconds, setCountdownSeconds] = useState(60);
   const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
 
   useEffect(() => {
     if (isProcessing) {
-      setElapsedSeconds(0);
+      setCountdownSeconds(60);
       processingTimerRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        setCountdownSeconds((prev) => Math.max(0, prev - 1));
       }, 1000);
     } else if (processingTimerRef.current) {
       clearInterval(processingTimerRef.current);
@@ -570,82 +537,22 @@ export const PasswordManagerScreen: React.FC = () => {
         >
           <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
           <View style={styles.loadingContent}>
-            <View
-              style={[
-                styles.loadingIconCircle,
-                {
-                  backgroundColor: colors.primary + "18",
-                  borderColor: colors.primary + "33",
-                },
-              ]}
-            >
-              <Feather name="shield" size={38} color={colors.primary} />
-            </View>
-
-            <Text style={[styles.loadingTitle, { color: colors.textPrimary }]}>
-              {processingMessage}
-            </Text>
-
-            <Text
-              style={[styles.loadingSubtitle, { color: colors.textSecondary }]}
-            >
-              Deriving your master key with Argon2id. This may take a few
-              seconds.
-            </Text>
-
             <View style={styles.loadingIndicatorWrapper}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
 
-            <UnlockProgressBar color={colors.primary} track={colors.divider} />
-
-            <Text
-              style={[styles.loadingTimer, { color: colors.textSecondary }]}
-            >
-              {formatElapsed(elapsedSeconds)}
+            <Text style={[styles.loadingTimer, { color: colors.textPrimary }]}>
+              {formatCountdown(countdownSeconds)}
             </Text>
 
-            <View
+            <Text
               style={[
-                styles.loadingSecurityBadge,
-                {
-                  backgroundColor: colors.secondaryBackground,
-                  borderColor: isDark
-                    ? "rgba(255, 255, 255, 0.08)"
-                    : "rgba(0, 0, 0, 0.06)",
-                },
+                styles.loadingVerifyingText,
+                { color: colors.textSecondary },
               ]}
             >
-              <Feather name="lock" size={14} color={colors.primary} />
-              <Text
-                style={[
-                  styles.loadingSecurityBadgeText,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                Zero-Knowledge End-to-End Encrypted
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.loadingWarning,
-                {
-                  backgroundColor: colors.warning + "14",
-                  borderColor: colors.warning + "40",
-                },
-              ]}
-            >
-              <Feather name="alert-circle" size={15} color={colors.warning} />
-              <Text
-                style={[
-                  styles.loadingWarningText,
-                  { color: colors.textPrimary },
-                ]}
-              >
-                Please keep the app open
-              </Text>
-            </View>
+              verifying ... dont close app or go back
+            </Text>
           </View>
         </SafeAreaView>
       </Modal>
@@ -1820,77 +1727,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.xl,
   },
-  loadingIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: spacing.lg,
-    borderWidth: 1.5,
-  },
-  loadingTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    fontFamily: typography.family,
-    textAlign: "center",
-    marginBottom: spacing.xs,
-  },
-  loadingSubtitle: {
-    fontSize: 14,
-    fontFamily: typography.family,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    lineHeight: 20,
-    paddingHorizontal: spacing.sm,
-  },
   loadingIndicatorWrapper: {
-    marginBottom: spacing.lg,
-  },
-  unlockProgressTrack: {
-    width: "100%",
-    height: 6,
-    borderRadius: 3,
-    overflow: "hidden",
-    marginBottom: spacing.xs,
-  },
-  unlockProgressFill: {
-    height: "100%",
-    borderRadius: 3,
+    marginBottom: spacing.xl,
   },
   loadingTimer: {
+    fontSize: 28,
+    fontWeight: "700",
+    fontFamily: typography.family,
+    marginBottom: spacing.sm,
+    letterSpacing: 1,
+  },
+  loadingVerifyingText: {
     fontSize: 14,
-    fontWeight: "600",
-    fontFamily: typography.family,
-    marginBottom: spacing.xl,
-  },
-  loadingSecurityBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  loadingSecurityBadgeText: {
-    fontSize: 12,
     fontWeight: "500",
     fontFamily: typography.family,
-  },
-  loadingWarning: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: spacing.xs,
-  },
-  loadingWarningText: {
-    fontSize: 12,
-    fontWeight: "500",
-    fontFamily: typography.family,
+    textAlign: "center",
+    lineHeight: 20,
+    opacity: 0.85,
   },
 });

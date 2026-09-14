@@ -25,7 +25,7 @@
  * decryptable with this implementation — no re-encryption required.
  */
 
-import { argon2id } from "@noble/hashes/argon2.js";
+import { argon2id, argon2idAsync } from "@noble/hashes/argon2.js";
 import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 
@@ -260,11 +260,12 @@ export const deriveKEK = async (
   try {
     // memlimit in schema is bytes; @noble argon2id expects kibibytes.
     const memKb = Math.floor(params.memlimit / 1024);
-    return argon2id(utf8ToBytes(password), saltBytes, {
+    return await argon2idAsync(utf8ToBytes(password), saltBytes, {
       t: params.opslimit,
       m: memKb,
       p: ARGON2ID_P,
       dkLen: KEY_BYTES,
+      asyncTick: 10,
     });
   } catch (error) {
     throw new VaultCryptoError(

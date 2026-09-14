@@ -111,10 +111,12 @@ export const PasswordManagerScreen: React.FC = () => {
 
   useEffect(() => {
     if (isProcessing) {
+      const startTime = Date.now();
       setCountdownSeconds(60);
       processingTimerRef.current = setInterval(() => {
-        setCountdownSeconds((prev) => Math.max(0, prev - 1));
-      }, 1000);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        setCountdownSeconds(Math.max(0, 60 - elapsed));
+      }, 200);
     } else if (processingTimerRef.current) {
       clearInterval(processingTimerRef.current);
       processingTimerRef.current = null;
@@ -551,7 +553,7 @@ export const PasswordManagerScreen: React.FC = () => {
                 { color: colors.textSecondary },
               ]}
             >
-              verifying ... dont close app or go back
+              Verifying.... Please keep the app open.
             </Text>
           </View>
         </SafeAreaView>
